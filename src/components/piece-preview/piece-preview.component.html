@@ -1,0 +1,10 @@
+<div class="grid" [style.grid-template-columns]="'repeat(' + piece()[0].length + ', 1fr)'">
+  @for (row of piece(); track $index) {
+    @for (cell of row; track $index) {
+      <div 
+        class="aspect-square w-4 h-4"
+        [class]="cell > 0 ? 'bg-' + colors[cell] : 'bg-transparent'">
+      </div>
+    }
+  }
+</div>

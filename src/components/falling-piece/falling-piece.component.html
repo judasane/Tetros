@@ -1,0 +1,18 @@
+<div 
+  class="absolute grid z-20"
+  [style.transition]="transitionStyle()"
+  [style.left.px]="position().left"
+  [style.top.px]="position().top"
+  [style.grid-template-columns]="'repeat(' + (pieceShape()[0]?.length || 0) + ', ' + cellSize() + 'px)'"
+  [class.opacity-40]="isGhost()">
+  @for (row of pieceShape(); track $index) {
+    @for (cell of row; track $index) {
+      <div 
+        class="aspect-square"
+        [style.width.px]="cellSize()"
+        [style.height.px]="cellSize()"
+        [class]="getCellClass(cell)">
+      </div>
+    }
+  }
+</div>

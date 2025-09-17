@@ -1,0 +1,32 @@
+<div 
+  class="relative bg-slate-800/50 overflow-hidden grid" 
+  [style.grid-template-columns]="'repeat(' + COLS + ', ' + cellSize() + 'px)'"
+  [style.width.px]="COLS * cellSize()"
+>
+  <!-- The static board grid for locked pieces -->
+  @for (row of boardToRender(); track $index) {
+    @for (cell of row; track $index) {
+      <app-cell [value]="cell" />
+    }
+  }
+
+  <!-- The smoothly animated ghost piece -->
+  @if (ghostPiece(); as ghost) {
+    <app-falling-piece 
+        [piece]="ghost" 
+        [isGhost]="true" 
+        [animationMode]="animationMode()"
+        [cellSize]="cellSize()"
+        />
+  }
+
+  <!-- The smoothly animated current piece -->
+  @if (currentPiece(); as piece) {
+    <app-falling-piece 
+        [piece]="piece"
+        [animationMode]="animationMode()"
+        [dropProgress]="dropProgress()"
+        [cellSize]="cellSize()"
+        />
+  }
+</div>
