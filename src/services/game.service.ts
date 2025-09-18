@@ -1,5 +1,5 @@
 /**
- * @fileoverview Manages the core game state and logic for TetroBomber.
+ * @fileoverview Manages the core game state and logic for Tetros.
  */
 import { Injectable, computed, signal } from '@angular/core';
 import { createEmptyBoard, applyGravityToColumn } from '../utils/board.utils';

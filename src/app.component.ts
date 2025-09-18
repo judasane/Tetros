@@ -1,5 +1,5 @@
 /**
- * @fileoverview Root component for the TetroBomber application.
+ * @fileoverview Root component for the Tetros application.
  */
 import { ChangeDetectionStrategy, Component, inject, signal, OnInit, computed } from '@angular/core';
 import { GameService } from './services/game.service';
