@@ -1,5 +1,5 @@
-@if (gameState() === 'start' || gameState() === 'paused' || gameState() === 'gameover' || gameState() === 'countdown') {
-  <div class="absolute inset-0 bg-black/70 flex flex-col justify-center items-center text-center backdrop-blur-sm z-10 p-4">
+ @if (gameState() === 'start' || gameState() === 'paused' || gameState() === 'gameover' || gameState() === 'countdown') {
+  <div class="absolute inset-0 bg-black/70 flex flex-col justify-center items-center text-center backdrop-blur-sm z-30 p-4">
     @switch (gameState()) {
       @case ('start') {
         <h2 class="text-3xl font-bold text-cyan-400 mb-4">Welcome!</h2>
@@ -17,17 +17,15 @@
         </div>
       }
       @case ('paused') {
-        <h2 class="text-3xl font-bold text-yellow-400 mb-4">Paused</h2>
-        <div class="flex flex-col sm:flex-row gap-4 mb-4">
-            <button (click)="togglePause.emit()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-md text-lg w-40">Resume</button>
-            <button (click)="restart.emit()" class="px-6 py-3 border-2 border-green-500 text-green-500 hover:bg-green-500/20 transition-colors rounded-md text-lg w-40">Restart</button>
-        </div>
-        <div class="mb-8 w-full max-w-xs px-10">
-            <button (click)="toggleAnimation.emit()" class="px-4 py-2 border-2 border-cyan-500 text-cyan-500 hover:bg-cyan-500/20 transition-colors rounded-md text-sm w-full capitalize">
+        <h2 class="text-3xl font-bold text-yellow-400 mb-6">Paused</h2>
+        <div class="flex flex-col gap-4 w-full max-w-[220px] mb-6">
+            <button (click)="togglePause.emit()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-base w-full">Resume</button>
+            <button (click)="restart.emit()" class="px-4 py-2 border-2 border-green-500 text-green-500 hover:bg-green-500/20 transition-colors rounded-md text-base w-full">Restart</button>
+            <button (click)="toggleAnimation.emit()" class="px-4 py-2 border-2 border-cyan-500 text-cyan-500 hover:bg-cyan-500/20 transition-colors rounded-md text-xs w-full capitalize">
                 Animation: {{ animationMode() }}
             </button>
         </div>
-         <div class="mt-8 text-left text-sm max-w-xs">
+         <div class="text-left text-sm max-w-xs">
             <h3 class="text-lg text-cyan-400 mb-2 text-center uppercase tracking-widest">Controls</h3>
             <ul class="text-xs space-y-1 text-slate-300">
              <li><span class="font-bold text-cyan-400 w-20 inline-block">Arrows:</span> Move</li>

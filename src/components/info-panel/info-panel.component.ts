@@ -16,5 +16,5 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 })
 export class InfoPanelComponent {
   /** The title to be displayed at the top of the panel. */
-  title = input.required<string>();
+  title = input<string | undefined>();
 }

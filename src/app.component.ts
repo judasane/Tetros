@@ -1,7 +1,7 @@
 /**
  * @fileoverview Root component for the TetroBomber application.
  */
-import { ChangeDetectionStrategy, Component, inject, signal, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, OnInit, computed } from '@angular/core';
 import { GameService } from './services/game.service';
 import { BoardComponent } from './components/board/board.component';
 import { GameOverlayComponent } from './components/game-overlay/game-overlay.component';
@@ -39,6 +39,12 @@ export class AppComponent implements OnInit {
   /** The dynamically calculated size of a single board cell in pixels. */
   cellSize = signal(32);
 
+  /** A signal indicating if the viewport is wide enough for the desktop layout. */
+  isDesktop = signal(window.innerWidth >= 768);
+
+  /** A computed signal for the total width of the game board in pixels. */
+  boardWidth = computed(() => COLS * this.cellSize());
+
   // --- Touch Gesture State ---
   private touchStartX = 0;
   private touchStartY = 0;
@@ -59,17 +65,25 @@ export class AppComponent implements OnInit {
   
   /**
    * Calculates and updates the optimal cell size based on the window's dimensions.
+   * This logic assumes a persistent two-column layout.
    */
   updateCellSize(): void {
-    const isMobile = window.innerWidth < 768; // md breakpoint in Tailwind
+    this.isDesktop.set(window.innerWidth >= 768);
+
+    // The layout is always a two-column flexbox.
+    // The total game area width is ~4/3 of the board's width. Let's use 95% of the viewport width.
+    const availableWidth = window.innerWidth * 0.95;
+    // The board's container (left column) takes up roughly 3/4 of that space.
+    const boardContainerWidth = availableWidth * 0.75;
+
+    // Use 90% of the viewport height for the game area.
+    const availableHeight = window.innerHeight * 0.90;
     
-    // On mobile, leave space for top/bottom panels
-    // On desktop, leave space for side panels
-    const availableHeight = isMobile ? window.innerHeight * 0.6 : window.innerHeight * 0.85;
-    const availableWidth = isMobile ? window.innerWidth * 0.95 : window.innerWidth * 0.4;
-    
-    const sizeByHeight = availableHeight / ROWS;
-    const sizeByWidth = availableWidth / COLS;
+    // Calculate cell size based on available width for the board.
+    const sizeByWidth = boardContainerWidth / COLS;
+    // Calculate cell size based on available height, estimating space for the power-ups panel.
+    // The powerups + board height is roughly equivalent to ROWS + 4 cells vertically.
+    const sizeByHeight = availableHeight / (ROWS + 4); 
     
     this.cellSize.set(Math.floor(Math.min(sizeByHeight, sizeByWidth)));
   }
