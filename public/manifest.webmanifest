@@ -1,6 +1,9 @@
 {
-  "name": "app",
-  "short_name": "app",
+  "name": "Tetros",
+  "short_name": "Tetros",
+  "description": "Un juego de Tetris moderno",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",
