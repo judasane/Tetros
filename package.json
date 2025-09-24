@@ -7,7 +7,8 @@
     "dev": "ng serve",
     "build": "ng build",
     "preview": "ng serve --configuration=production",
-    "test": "vitest"
+    "test": "vitest",
+    "lint": "ng lint"
   },
   "dependencies": {
     "@angular/build": "^20.1.0",
@@ -24,7 +25,17 @@
     "zone.js": "^0.15.0"
   },
   "devDependencies": {
+    "@angular-eslint/builder": "^18.1.0",
+    "@angular-eslint/eslint-plugin": "^18.1.0",
+    "@angular-eslint/eslint-plugin-template": "^18.1.0",
+    "@angular-eslint/template-parser": "^18.1.0",
     "@types/node": "^22.14.0",
+    "@typescript-eslint/eslint-plugin": "^7.17.0",
+    "@typescript-eslint/parser": "^7.17.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-jsdoc": "^48.8.1",
+    "eslint-plugin-prefer-arrow": "^1.2.3",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vitest": "^3.1.1",
