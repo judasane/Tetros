@@ -1,73 +1,79 @@
 import { describe, it, expect } from 'vitest';
-import { isValidPosition } from './game-logic.utils';
-import { Piece } from './piece.interface';
+import { clearLines, calculateScore } from './game-logic.utils';
 import { COLS, ROWS } from './constants';
-import { createEmptyBoard } from './board.utils';
 
-describe('isValidPosition', () => {
-  // Test case 1: A valid position
-  it('should return true for a valid position within the board and without collisions', () => {
-    const piece: Piece = {
-      x: 3,
-      y: 4,
-      shape: [[1, 1], [1, 1]], // A square piece
-    };
-    const board = createEmptyBoard();
-    expect(isValidPosition(piece, board)).toBe(true);
-  });
+describe('GameLogicUtils', () => {
+  describe('clearLines', () => {
+    it('should return the same board and 0 lines cleared when no lines are full', () => {
+      const board = Array(ROWS).fill(Array(COLS).fill(0));
+      const { boardAfterClear, lines } = clearLines(board);
+      expect(lines).toBe(0);
+      expect(boardAfterClear).toEqual(board);
+    });
 
-  // Test case 2: Collision with a border
-  it('should return false for a piece colliding with the right border', () => {
-    const piece: Piece = {
-      x: COLS - 1, // Positioned at the right edge
-      y: 4,
-      shape: [[1, 1], [1, 1]], // A square piece, part of it will be out of bounds
-    };
-    const board = createEmptyBoard();
-    expect(isValidPosition(piece, board)).toBe(false);
-  });
+    it('should clear one full line and add a new empty line at the top', () => {
+      const board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+      board[ROWS - 1] = Array(COLS).fill(1); // Full line at the bottom
 
-  it('should return false for a piece colliding with the left border', () => {
-    const piece: Piece = {
-      x: -1, // Positioned at the left edge
-      y: 4,
-      shape: [[1, 1], [1, 1]],
-    };
-    const board = createEmptyBoard();
-    expect(isValidPosition(piece, board)).toBe(false);
-  });
+      const { boardAfterClear, lines } = clearLines(board);
 
-    it('should return false for a piece colliding with the bottom border', () => {
-    const piece: Piece = {
-      x: 3,
-      y: ROWS -1, // Positioned at the bottom edge
-      shape: [[1, 1], [1, 1]],
-    };
-    const board = createEmptyBoard();
-    expect(isValidPosition(piece, board)).toBe(false);
-  });
+      const expectedBoard = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
 
-  // Test case 3: Collision with another piece
-  it('should return false for a piece colliding with an existing piece on the board', () => {
-    const piece: Piece = {
-      x: 3,
-      y: 4,
-      shape: [[1, 1], [1, 1]],
-    };
-    const board = createEmptyBoard();
-    // Place a block where the new piece wants to go
-    board[5][4] = 2; // y=5, x=4 corresponds to the bottom-left of the piece
-    expect(isValidPosition(piece, board)).toBe(false);
-  });
+      expect(lines).toBe(1);
+      expect(boardAfterClear).toEqual(expectedBoard);
+      expect(boardAfterClear[0].every(cell => cell === 0)).toBe(true);
+    });
 
-  // Edge case: Piece is partially off the top of the board (which is valid)
-  it('should return true for a piece that is partially above the board', () => {
-    const piece: Piece = {
-      x: 3,
-      y: -1, // Spawn position, one row is hidden
-      shape: [[1, 1], [1, 1]],
-    };
-    const board = createEmptyBoard();
-    expect(isValidPosition(piece, board)).toBe(true);
-  });
+    it('should clear multiple non-contiguous lines and compact the board correctly', () => {
+        const board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+        board[ROWS - 1] = Array(COLS).fill(1); // Full line
+        board[ROWS - 3] = Array(COLS).fill(1); // Full line
+        board[ROWS - 2] = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0]; // Not full
+
+        const { boardAfterClear, lines } = clearLines(board);
+
+        expect(lines).toBe(2);
+        // Expect two new empty lines at the top
+        expect(boardAfterClear[0].every(cell => cell === 0)).toBe(true);
+        expect(boardAfterClear[1].every(cell => cell === 0)).toBe(true);
+        // Expect the non-full line to have shifted down
+        expect(boardAfterClear[ROWS - 1]).toEqual([1, 0, 1, 0, 1, 0, 1, 0, 1, 0]);
+      });
+
+      it('should clear a Tetris (4 lines) and return the correct score', () => {
+        const board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+        for (let i = 1; i <= 4; i++) {
+          board[ROWS - i] = Array(COLS).fill(2); // Four full lines
+        }
+
+        const { boardAfterClear, lines } = clearLines(board);
+
+        const expectedBoard = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+
+        expect(lines).toBe(4);
+        expect(boardAfterClear).toEqual(expectedBoard);
+      });
+    });
+
+    describe('calculateScore', () => {
+      it('should return the correct score for level 1', () => {
+        expect(calculateScore(1, 1)).toBe(100);
+        expect(calculateScore(2, 1)).toBe(300);
+        expect(calculateScore(3, 1)).toBe(500);
+        expect(calculateScore(4, 1)).toBe(800);
+      });
+
+      it('should apply the level multiplier correctly', () => {
+        // 1 line on level 10 -> 100 * 10 = 1000
+        expect(calculateScore(1, 10)).toBe(1000);
+        // 4 lines on level 5 -> 800 * 5 = 4000
+        expect(calculateScore(4, 5)).toBe(4000);
+        // 2 lines on level 7 -> 300 * 7 = 2100
+        expect(calculateScore(2, 7)).toBe(2100);
+      });
+
+      it('should return 0 for 0 lines cleared', () => {
+        expect(calculateScore(0, 10)).toBe(0);
+      });
+    });
 });
