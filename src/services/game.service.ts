@@ -2,6 +2,7 @@
  * @fileoverview Manages the core game state and logic for Tetros.
  */
 import { Injectable, computed, signal } from '@angular/core';
+import { AudioService } from './audio.service';
 import { createEmptyBoard, applyGravityToColumn } from '../utils/board.utils';
 import { isValidPosition, clearLines, calculateScore } from '../utils/game-logic.utils';
 import { getRandomPiece, rotate } from '../utils/piece.utils';
@@ -76,6 +77,7 @@ export class GameService {
   private readonly arrInterval = 40;  // ms
   private softDropInterval: any = null;
 
+  constructor(private audioService: AudioService) {}
 
   /**
    * A computed signal that calculates the position of the ghost piece.
@@ -134,6 +136,7 @@ export class GameService {
 
     this.gameState.set('countdown');
     this.countdownValue.set(3);
+    this.audioService.playStartGame();
 
     this.countdownIntervalId = setInterval(() => {
       this.countdownValue.update(v => v - 1);
@@ -236,6 +239,7 @@ export class GameService {
     if (piece && ghost) {
       const droppedPiece = { ...piece, y: ghost.y };
       this.currentPiece.set(droppedPiece);
+      this.audioService.playHardDrop();
       this.lockPiece();
     }
   }
@@ -269,6 +273,7 @@ export class GameService {
 
       if (isValidPosition(kickedPiece, this.board())) {
         this.currentPiece.set(kickedPiece);
+        this.audioService.playRotate();
         return; // Rotation successful
       }
     }
@@ -280,6 +285,7 @@ export class GameService {
    */
   hold(): void {
     if (!this.isHoldingAllowed() || this.gameState() !== 'playing') return;
+    this.audioService.playHold();
     const current = this.currentPiece();
     const held = this.holdPiece();
 
@@ -326,6 +332,7 @@ export class GameService {
     const newPiece = { ...piece, x: piece.x + dx, y: piece.y + dy };
     if (isValidPosition(newPiece, this.board())) {
       this.currentPiece.set(newPiece);
+      this.audioService.playMove();
       return true;
     }
     return false;
@@ -371,6 +378,7 @@ export class GameService {
         this.board.set(animationBoard);
 
         setTimeout(() => {
+            this.audioService.playLineClear();
             const { boardAfterClear, lines } = clearLines(boardWithPiece);
             this.board.set(boardAfterClear);
 
@@ -388,6 +396,7 @@ export class GameService {
             requestAnimationFrame((time) => this.gameLoop(time));
         }, 300); // Animation duration
     } else {
+        this.audioService.playLock();
         this.board.set(boardWithPiece);
         this.spawnNewPiece();
         this.isHoldingAllowed.set(true);
@@ -405,6 +414,7 @@ export class GameService {
 
     if (!isValidPosition(this.currentPiece()!, this.board())) {
         this.gameState.set('gameover');
+        this.audioService.playGameOver();
     }
   }
   
@@ -416,6 +426,7 @@ export class GameService {
       if (!this.canUsePowerUp(powerUp)) return;
       
       this.powerUps.update(p => ({...p, [powerUp]: p[powerUp] - 1}));
+      this.audioService.playPowerUp();
 
       switch(powerUp) {
           case 'laser':
