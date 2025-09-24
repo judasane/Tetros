@@ -2,7 +2,7 @@
  * @fileoverview Root component for the Tetros application.
  */
 import { ChangeDetectionStrategy, Component, inject, signal, OnInit, computed } from '@angular/core';
-import { GameService } from './services/game.service';
+import { GameFacade } from './services/game.facade';
 import { BoardComponent } from './components/board/board.component';
 import { GameOverlayComponent } from './components/game-overlay/game-overlay.component';
 import { InfoPanelComponent } from './components/info-panel/info-panel.component';
@@ -25,7 +25,7 @@ import { COLS, ROWS } from './utils/constants';
     InfoPanelComponent,
     PiecePreviewComponent,
   ],
-  providers: [GameService],
+  providers: [],
   host: {
     '(window:keydown)': 'handleKeyDown($event)',
     '(window:keyup)': 'handleKeyUp($event)',
@@ -33,8 +33,8 @@ import { COLS, ROWS } from './utils/constants';
   }
 })
 export class AppComponent implements OnInit {
-  /** Injected instance of the GameService, which manages all game state and logic. */
-  game = inject(GameService);
+  /** Injected instance of the GameFacade, which provides a simplified interface to the game systems. */
+  game = inject(GameFacade);
 
   /** The dynamically calculated size of a single board cell in pixels. */
   cellSize = signal(32);
@@ -94,20 +94,18 @@ export class AppComponent implements OnInit {
    */
   handleKeyDown(event: KeyboardEvent): void {
     if (event.repeat) return;
-    if (this.game.gameState() === 'gameover' || this.game.isAiming()) {
-      if (this.game.isAiming()) this.game.handleAimerKeys(event.key);
-      return;
-    }
+
+    // Handle global controls like start and pause
     if (this.game.gameState() === 'start' && event.key === 'Enter') {
       this.game.startGame();
       return;
     }
-    if (this.game.gameState() === 'countdown' || this.game.gameState() === 'clearing') return;
-    if (event.key === 'p' || event.key === 'P') {
+    if ((this.game.gameState() === 'playing' || this.game.gameState() === 'paused') && (event.key === 'p' || event.key === 'P')) {
       this.game.togglePause();
       return;
     }
-    if (this.game.gameState() === 'paused') return;
+
+    // Delegate all other game-related key presses to the input service via the facade
     this.game.pressKey(event.key);
   }
 
