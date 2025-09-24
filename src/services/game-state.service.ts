@@ -34,6 +34,7 @@ export class GameStateService {
   powerUps = signal<{[key in PowerUp]: number}>({ laser: 1, slow: 1, mutate: 1, aimer: 1 });
   isAiming = signal(false);
   aimerPosition = signal({ x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) });
+  slowMotionActive = signal(false);
 
   constructor() { }
 }

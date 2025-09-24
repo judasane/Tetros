@@ -1,7 +1,6 @@
 import { Injectable, inject, effect } from '@angular/core';
 import { GameStateService } from './game-state.service';
 import { GameActionsService } from './game-actions.service';
-import { PowerUpService } from './power-up.service';
 
 @Injectable({
   providedIn: 'root'
@@ -9,7 +8,6 @@ import { PowerUpService } from './power-up.service';
 export class GameLoopService {
   private state = inject(GameStateService);
   private actions = inject(GameActionsService);
-  private powerUps = inject(PowerUpService);
 
   private lastTime = 0;
   private dropCounter = 0;
@@ -60,7 +58,7 @@ export class GameLoopService {
     this.lastTime = time;
     this.dropCounter += deltaTime;
 
-    const dropInterval = (1000 / this.state.level()) * (this.powerUps.isSlowMotionActive() ? 3 : 1);
+    const dropInterval = (1000 / this.state.level()) * (this.state.slowMotionActive() ? 3 : 1);
 
     if (!this.state.softDropActive()) {
       while (this.dropCounter >= dropInterval) {

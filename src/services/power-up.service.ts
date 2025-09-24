@@ -3,7 +3,6 @@ import { GameStateService, PowerUp } from './game-state.service';
 import { BoardService } from './board.service';
 import { getRandomPiece } from '../utils/piece.utils';
 import { ROWS, COLS, SLOW_POWERUP_DURATION } from '../utils/constants';
-import { GameLoopService } from './game-loop.service';
 
 @Injectable({
   providedIn: 'root'
@@ -11,23 +10,10 @@ import { GameLoopService } from './game-loop.service';
 export class PowerUpService {
   private state = inject(GameStateService);
   private boardService = inject(BoardService);
-  // Injected here to restart the loop after the aimer power-up is used.
-  private loopService: GameLoopService;
-
-  private slowMotionActive = false;
-
-  constructor() {
-    // Manually inject to handle potential circular dependencies, although none exist in this path.
-    this.loopService = inject(GameLoopService);
-  }
-
-  isSlowMotionActive(): boolean {
-    return this.slowMotionActive;
-  }
 
   /** Resets the internal state of the service. */
   reset(): void {
-    this.slowMotionActive = false;
+    this.state.slowMotionActive.set(false);
   }
 
   canUsePowerUp(powerUp: PowerUp): boolean {
@@ -55,8 +41,8 @@ export class PowerUpService {
         this.boardService.clearRow(y);
         break;
       case 'slow':
-        this.slowMotionActive = true;
-        setTimeout(() => this.slowMotionActive = false, SLOW_POWERUP_DURATION);
+        this.state.slowMotionActive.set(true);
+        setTimeout(() => this.state.slowMotionActive.set(false), SLOW_POWERUP_DURATION);
         break;
       case 'mutate':
         this.state.currentPiece.set(getRandomPiece());
@@ -117,7 +103,5 @@ export class PowerUpService {
     this.boardService.applyGravityToColumn(x);
 
     this.state.gameState.set('playing');
-    this.loopService.resetTime();
-    this.loopService.start();
   }
 }

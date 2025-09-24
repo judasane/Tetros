@@ -17,7 +17,7 @@ export class GameFacade {
   private actions = inject(GameActionsService);
   private loop = inject(GameLoopService);
   private input = inject(InputService);
-  private powerUps = inject(PowerUpService);
+  private powerUpService = inject(PowerUpService);
   private animation = inject(AnimationService);
 
   private countdownIntervalId: any = null;
@@ -47,13 +47,23 @@ export class GameFacade {
   readonly hold = this.actions.hold.bind(this.actions);
 
   // --- Input Methods (for keyboard controls) ---
-  pressKey(key: string) { this.input.press(key); }
+  pressKey(key: string): void {
+    if (this.state.isAiming()) {
+      this.powerUpService.handleAimerKeys(key);
+
+      if (key === 'Enter') {
+        this.loop.resetTime();
+        this.loop.start();
+      }
+    } else {
+      this.input.press(key);
+    }
+  }
   releaseKey(key: string) { this.input.release(key); }
 
   // --- PowerUp Methods ---
-  activatePowerUp(powerUp: PowerUp) { this.powerUps.activatePowerUp(powerUp); }
-  canUsePowerUp = this.powerUps.canUsePowerUp.bind(this.powerUps);
-  handleAimerKeys(key: string) { this.powerUps.handleAimerKeys(key); }
+  activatePowerUp(powerUp: PowerUp) { this.powerUpService.activatePowerUp(powerUp); }
+  canUsePowerUp = this.powerUpService.canUsePowerUp.bind(this.powerUpService);
 
   // --- Animation Methods ---
   toggleAnimationMode() { this.animation.toggleAnimationMode(); }
@@ -64,7 +74,7 @@ export class GameFacade {
       clearInterval(this.countdownIntervalId);
     }
     this.input.clearTimers();
-    this.powerUps.reset();
+    this.powerUpService.reset();
 
     // Reset all state
     this.state.board.set(createEmptyBoard());
