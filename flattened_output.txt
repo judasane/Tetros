@@ -1,7 +1,7 @@
 --- FLATTENED REPOSITORY SOURCE ---
-Generated at: Wed Sep 24 12:26:50 UTC 2025
+Generated at: Wed Sep 24 15:26:16 UTC 2025
 Branch: main
-Commit: c30909f396051c32a13518046c0cf94d8f67aaba
+Commit: bab593fe0dc577439e20b72c65a80a5e9bc4dcc3
 ------------------------------------
 
 --- START OF FILE: .github/workflows/deploy.yml ---
@@ -152,10 +152,10 @@ dist-ssr
 --- END OF FILE: .gitignore ---
 
 --- START OF FILE: .idx/dev.nix ---
-@dev.nix{pkgs}: {
-  channel = "stable-24.05";
+{ pkgs }: {
+  channel = "stable-24.11";
   packages = [
-    pkgs.nodejs_20
+    pkgs.nodejs_22
   ];
   idx.extensions = [
     "angular.ng-template"
@@ -178,6 +178,7 @@ dist-ssr
     };
   };
 }
+
 --- END OF FILE: .idx/dev.nix ---
 
 --- START OF FILE: README.md ---
@@ -418,7 +419,8 @@ bootstrapApplication(AppComponent, {
   "scripts": {
     "dev": "ng serve",
     "build": "ng build",
-    "preview": "ng serve --configuration=production"
+    "preview": "ng serve --configuration=production",
+    "test": "vitest"
   },
   "dependencies": {
     "@angular/build": "^20.1.0",
@@ -428,14 +430,19 @@ bootstrapApplication(AppComponent, {
     "@angular/compiler-cli": "^20.1.0",
     "@angular/core": "^20.1.0",
     "@angular/platform-browser": "^20.1.0",
+    "@angular/platform-browser-dynamic": "^20.1.0",
     "@angular/service-worker": "^20.1.0",
     "rxjs": "^7.8.2",
-    "tailwindcss": "latest"
+    "tailwindcss": "latest",
+    "zone.js": "^0.15.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vitest": "^3.1.1",
+    "jsdom": "^24.1.1",
+    "@analogjs/vite-plugin-angular": "^1.9.0"
   }
 }
 --- END OF FILE: package.json ---
@@ -1462,6 +1469,130 @@ export class BoardService {
 
 --- END OF FILE: src/services/board.service.ts ---
 
+--- START OF FILE: src/services/game-actions.service.spec.ts ---
+import { TestBed } from '@angular/core/testing';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { GameActionsService } from './game-actions.service';
+import { GameStateService } from './game-state.service';
+import { BoardService } from './board.service';
+import { AnimationService } from './animation.service';
+import { Piece } from '../utils/piece.interface';
+import { createEmptyBoard } from '../utils/board.utils';
+import * as gameLogicUtils from '../utils/game-logic.utils';
+import { signal } from '@angular/core';
+
+vi.mock('../utils/game-logic.utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof gameLogicUtils>();
+  return {
+    ...actual, // Keep other functions from the module
+    isValidPosition: vi.fn(), // Mock isValidPosition specifically
+  };
+});
+
+describe('GameActionsService', () => {
+  let actionsService: GameActionsService;
+  let mockStateService: GameStateService;
+  let mockBoardService: Partial<BoardService>;
+  let mockAnimationService: Partial<AnimationService>;
+
+  // Mock signals for state
+  const mockCurrentPiece = signal<Piece | null>(null);
+  const mockBoard = signal(createEmptyBoard());
+
+  beforeEach(() => {
+    // Reset mocks before each test
+    vi.mocked(gameLogicUtils.isValidPosition).mockClear();
+
+    // Define mock implementations for the services
+    mockStateService = {
+      currentPiece: mockCurrentPiece,
+      board: mockBoard,
+      // Add any other properties from GameStateService that are used
+    } as GameStateService;
+
+    mockBoardService = {
+      // Mock methods used by GameActionsService if any
+    };
+
+    mockAnimationService = {
+      // Mock methods used by GameStateService if any
+    };
+
+    // Configure the test bed
+    TestBed.configureTestingModule({
+      providers: [
+        GameActionsService,
+        { provide: GameStateService, useValue: mockStateService },
+        { provide: BoardService, useValue: mockBoardService },
+        { provide: AnimationService, useValue: mockAnimationService },
+      ],
+    });
+
+    // Get the service instance from the TestBed injector
+    actionsService = TestBed.inject(GameActionsService);
+
+    // Reset signals before each test
+    mockCurrentPiece.set(null);
+    mockBoard.set(createEmptyBoard());
+  });
+
+  it('should rotate the current piece successfully if the rotation is valid', () => {
+    // 1. Arrange
+    // For this test, we need isValidPosition to return true
+    vi.mocked(gameLogicUtils.isValidPosition).mockReturnValue(true);
+
+    const initialPiece: Piece = {
+      x: 3,
+      y: 4,
+      shape: [[0, 1, 0], [1, 1, 1], [0, 0, 0]], // T-shape
+    };
+    // Set the initial state in our mock service
+    mockCurrentPiece.set(initialPiece);
+    mockBoard.set(createEmptyBoard());
+
+    // This is the correct clockwise rotation of the T-piece
+    const rotatedShape = [[0, 1, 0], [0, 1, 1], [0, 1, 0]];
+
+    // 2. Act
+    actionsService.rotate();
+
+    // 3. Assert
+    const finalPiece = mockCurrentPiece();
+    expect(finalPiece).not.toBeNull();
+    expect(finalPiece!.shape).toEqual(rotatedShape);
+    // Position should be the same as no wall kick was needed
+    expect(finalPiece!.x).toBe(3);
+    expect(finalPiece!.y).toBe(4);
+  });
+
+  it('should not rotate the piece if isValidPosition always returns false', () => {
+    // 1. Arrange
+    const initialPiece: Piece = {
+      x: 1,
+      y: 1,
+      shape: [[0, 6, 0], [6, 6, 6], [0, 0, 0]], // T-piece
+    };
+    mockCurrentPiece.set(initialPiece);
+    mockBoard.set(createEmptyBoard());
+
+    // Force isValidPosition to always return false
+    vi.mocked(gameLogicUtils.isValidPosition).mockReturnValue(false);
+
+    // 2. Act
+    actionsService.rotate();
+
+    // 3. Assert
+    const finalPiece = mockCurrentPiece();
+    // The piece should not have changed because no valid rotation was found
+    expect(finalPiece!.shape).toEqual(initialPiece.shape);
+    expect(finalPiece!.x).toBe(initialPiece.x);
+    // Ensure the mock was actually called
+    expect(gameLogicUtils.isValidPosition).toHaveBeenCalled();
+  });
+});
+
+--- END OF FILE: src/services/game-actions.service.spec.ts ---
+
 --- START OF FILE: src/services/game-actions.service.ts ---
 import { Injectable, inject } from '@angular/core';
 import { GameStateService } from './game-state.service';
@@ -2112,6 +2243,23 @@ export class PowerUpService {
 
 --- END OF FILE: src/services/power-up.service.ts ---
 
+--- START OF FILE: src/test-setup.ts ---
+import 'zone.js';
+import 'zone.js/testing';
+import { getTestBed } from '@angular/core/testing';
+import {
+  BrowserDynamicTestingModule,
+  platformBrowserDynamicTesting,
+} from '@angular/platform-browser-dynamic/testing';
+
+// First, initialize the Angular testing environment.
+getTestBed().initTestEnvironment(
+  BrowserDynamicTestingModule,
+  platformBrowserDynamicTesting(),
+);
+
+--- END OF FILE: src/test-setup.ts ---
+
 --- START OF FILE: src/utils/board.utils.ts ---
 /**
  * @fileoverview Utility functions related to the game board.
@@ -2195,6 +2343,83 @@ export const PIECE_COLORS: { [key: number]: string } = {
 };
 
 --- END OF FILE: src/utils/constants.ts ---
+
+--- START OF FILE: src/utils/game-logic.utils.spec.ts ---
+import { describe, it, expect } from 'vitest';
+import { isValidPosition } from './game-logic.utils';
+import { Piece } from './piece.interface';
+import { COLS, ROWS } from './constants';
+import { createEmptyBoard } from './board.utils';
+
+describe('isValidPosition', () => {
+  // Test case 1: A valid position
+  it('should return true for a valid position within the board and without collisions', () => {
+    const piece: Piece = {
+      x: 3,
+      y: 4,
+      shape: [[1, 1], [1, 1]], // A square piece
+    };
+    const board = createEmptyBoard();
+    expect(isValidPosition(piece, board)).toBe(true);
+  });
+
+  // Test case 2: Collision with a border
+  it('should return false for a piece colliding with the right border', () => {
+    const piece: Piece = {
+      x: COLS - 1, // Positioned at the right edge
+      y: 4,
+      shape: [[1, 1], [1, 1]], // A square piece, part of it will be out of bounds
+    };
+    const board = createEmptyBoard();
+    expect(isValidPosition(piece, board)).toBe(false);
+  });
+
+  it('should return false for a piece colliding with the left border', () => {
+    const piece: Piece = {
+      x: -1, // Positioned at the left edge
+      y: 4,
+      shape: [[1, 1], [1, 1]],
+    };
+    const board = createEmptyBoard();
+    expect(isValidPosition(piece, board)).toBe(false);
+  });
+
+    it('should return false for a piece colliding with the bottom border', () => {
+    const piece: Piece = {
+      x: 3,
+      y: ROWS -1, // Positioned at the bottom edge
+      shape: [[1, 1], [1, 1]],
+    };
+    const board = createEmptyBoard();
+    expect(isValidPosition(piece, board)).toBe(false);
+  });
+
+  // Test case 3: Collision with another piece
+  it('should return false for a piece colliding with an existing piece on the board', () => {
+    const piece: Piece = {
+      x: 3,
+      y: 4,
+      shape: [[1, 1], [1, 1]],
+    };
+    const board = createEmptyBoard();
+    // Place a block where the new piece wants to go
+    board[5][4] = 2; // y=5, x=4 corresponds to the bottom-left of the piece
+    expect(isValidPosition(piece, board)).toBe(false);
+  });
+
+  // Edge case: Piece is partially off the top of the board (which is valid)
+  it('should return true for a piece that is partially above the board', () => {
+    const piece: Piece = {
+      x: 3,
+      y: -1, // Spawn position, one row is hidden
+      shape: [[1, 1], [1, 1]],
+    };
+    const board = createEmptyBoard();
+    expect(isValidPosition(piece, board)).toBe(true);
+  });
+});
+
+--- END OF FILE: src/utils/game-logic.utils.spec.ts ---
 
 --- START OF FILE: src/utils/game-logic.utils.ts ---
 /**
@@ -2368,12 +2593,35 @@ export function rotate(piece: Piece): Piece {
       ]
     }
   },
-  "files": [
-    "./index.tsx"
+  "include": [
+    "src/**/*.ts",
+    "*.ts",
+    "index.tsx"
   ],
   "angularCompilerOptions": {
     "disableTypeScriptVersionCheck": true
   }
 }
 --- END OF FILE: tsconfig.json ---
+
+--- START OF FILE: vite.config.ts ---
+/// <reference types="vitest" />
+import { defineConfig } from 'vite';
+import angular from '@analogjs/vite-plugin-angular';
+
+export default defineConfig({
+  plugins: [
+    angular({
+      tsconfig: 'tsconfig.json',
+    }),
+  ],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['src/test-setup.ts'],
+    include: ['src/**/*.spec.ts'],
+  },
+});
+
+--- END OF FILE: vite.config.ts ---
 
