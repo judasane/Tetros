@@ -5,7 +5,7 @@ import { AnimationService } from './animation.service';
 import { Piece } from '../utils/piece.interface';
 import { getRandomPiece, rotate } from '../utils/piece.utils';
 import { isValidPosition, calculateScore } from '../utils/game-logic.utils';
-import { LEVEL_THRESHOLD, COLS } from '../utils/constants';
+import { LEVEL_THRESHOLD, COLS, LINE_CLEAR_ANIMATION_DURATION } from '../utils/constants';
 
 @Injectable({
   providedIn: 'root'
@@ -141,7 +141,7 @@ export class GameActionsService {
         this.spawnNewPiece();
         this.state.isHoldingAllowed.set(true);
         this.state.gameState.set('playing');
-      }, 300);
+      }, LINE_CLEAR_ANIMATION_DURATION);
     } else {
       this.state.board.set(boardWithPiece);
       this.spawnNewPiece();

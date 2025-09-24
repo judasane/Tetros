@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { GameActionsService } from './game-actions.service';
 import { PowerUpService } from './power-up.service';
 import { GameStateService } from './game-state.service';
+import { DAS_DELAY, ARR_INTERVAL } from '../utils/constants';
 
 @Injectable({
   providedIn: 'root'
@@ -15,9 +16,6 @@ export class InputService {
   private dasTimer: any = null;
   private arrTimer: any = null;
   private softDropInterval: any = null;
-
-  private readonly dasDelay = 160; // ms
-  private readonly arrInterval = 40;  // ms
 
   /**
    * Handles a key press event.
@@ -37,8 +35,8 @@ export class InputService {
         const move = () => key === 'ArrowLeft' ? this.actions.moveLeft() : this.actions.moveRight();
         move();
         this.dasTimer = setTimeout(() => {
-          this.arrTimer = setInterval(move, this.arrInterval);
-        }, this.dasDelay);
+          this.arrTimer = setInterval(move, ARR_INTERVAL);
+        }, DAS_DELAY);
         break;
       case 'ArrowDown':
         if (this.softDropInterval) return;
@@ -46,7 +44,7 @@ export class InputService {
         this.actions.softDrop();
         this.softDropInterval = setInterval(() => {
             this.actions.softDrop();
-        }, this.arrInterval);
+        }, ARR_INTERVAL);
         break;
       case 'ArrowUp':
         this.actions.rotate();

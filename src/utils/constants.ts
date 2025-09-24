@@ -10,6 +10,17 @@ export const ROWS = 20;
 /** The number of lines that must be cleared to advance to the next level. */
 export const LEVEL_THRESHOLD = 10;
 
+// --- Timings ---
+
+// Animation timings
+export const LINE_CLEAR_ANIMATION_DURATION = 300; // ms
+export const SLOW_POWERUP_DURATION = 5000; // ms
+
+// Input timings
+export const DAS_DELAY = 160; // ms
+export const ARR_INTERVAL = 40; // ms
+
+
 /**
  * A mapping of piece color indices to their corresponding Tailwind CSS background color classes.
  */

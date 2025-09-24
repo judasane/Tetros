@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { GameStateService, PowerUp } from './game-state.service';
 import { BoardService } from './board.service';
 import { getRandomPiece } from '../utils/piece.utils';
-import { ROWS, COLS } from '../utils/constants';
+import { ROWS, COLS, SLOW_POWERUP_DURATION } from '../utils/constants';
 import { GameLoopService } from './game-loop.service';
 
 @Injectable({
@@ -43,12 +43,20 @@ export class PowerUpService {
       case 'laser':
         const piece = this.state.currentPiece();
         if (!piece) return;
-        const y = Math.min(ROWS - 1, piece.y + piece.shape.length);
+        // Find the lowest occupied row of the piece for more accurate targeting
+        let bottomRow = piece.y;
+        for (let row = piece.shape.length - 1; row >= 0; row--) {
+          if (piece.shape[row].some(cell => cell > 0)) {
+            bottomRow = piece.y + row;
+            break;
+          }
+        }
+        const y = Math.min(ROWS - 1, bottomRow + 1); // +1 to destroy the row just below the piece
         this.boardService.clearRow(y);
         break;
       case 'slow':
         this.slowMotionActive = true;
-        setTimeout(() => this.slowMotionActive = false, 5000);
+        setTimeout(() => this.slowMotionActive = false, SLOW_POWERUP_DURATION);
         break;
       case 'mutate':
         this.state.currentPiece.set(getRandomPiece());
@@ -94,13 +102,18 @@ export class PowerUpService {
 
   private executeAimer(): void {
     this.state.isAiming.set(false);
-    const { x } = this.state.aimerPosition();
+    const { x, y } = this.state.aimerPosition();
 
+    // First, clean the visual marker and destroy the target cell
     this.state.board.update(b => {
       const newBoard = b.map(row => row.map(cell => cell === -2 ? 0 : cell));
+      if (newBoard[y] && newBoard[y][x] !== undefined) {
+        newBoard[y][x] = 0; // Destroy the target cell
+      }
       return newBoard;
     });
 
+    // Then apply gravity to the column
     this.boardService.applyGravityToColumn(x);
 
     this.state.gameState.set('playing');

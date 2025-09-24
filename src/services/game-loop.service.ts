@@ -16,9 +16,10 @@ export class GameLoopService {
   private frameId: number | null = null;
 
   constructor() {
+    // Este effect observa el signal softDropActive para resetear el contador
+    // cuando el usuario inicia un soft drop manual, evitando drops dobles
+    // al sincronizar el drop manual con el automático del game loop
     effect(() => {
-      // When the user initiates a soft drop, reset the automatic drop counter
-      // to provide immediate feedback and prevent a double drop.
       if (this.state.softDropActive()) {
         this.resetCounter();
       }
