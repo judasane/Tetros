@@ -1,7 +1,7 @@
-@dev.nix{pkgs}: {
-  channel = "stable-24.05";
+{ pkgs }: {
+  channel = "stable-24.11";
   packages = [
-    pkgs.nodejs_20
+    pkgs.nodejs_22
   ];
   idx.extensions = [
     "angular.ng-template"
