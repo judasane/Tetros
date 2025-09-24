@@ -1,7 +1,7 @@
 --- FLATTENED REPOSITORY SOURCE ---
-Generated at: Thu Sep 18 16:05:34 UTC 2025
+Generated at: Wed Sep 24 12:26:28 UTC 2025
 Branch: main
-Commit: e792cb61efd9627db8f3925bf07a6cd52157782b
+Commit: 897134dce0b5c1a8dfbedbec0ceb1176064c4132
 ------------------------------------
 
 --- START OF FILE: .github/workflows/deploy.yml ---
@@ -613,7 +613,7 @@ bootstrapApplication(AppComponent, {
  * @fileoverview Root component for the Tetros application.
  */
 import { ChangeDetectionStrategy, Component, inject, signal, OnInit, computed } from '@angular/core';
-import { GameService } from './services/game.service';
+import { GameFacade } from './services/game.facade';
 import { BoardComponent } from './components/board/board.component';
 import { GameOverlayComponent } from './components/game-overlay/game-overlay.component';
 import { InfoPanelComponent } from './components/info-panel/info-panel.component';
@@ -636,7 +636,7 @@ import { COLS, ROWS } from './utils/constants';
     InfoPanelComponent,
     PiecePreviewComponent,
   ],
-  providers: [GameService],
+  providers: [],
   host: {
     '(window:keydown)': 'handleKeyDown($event)',
     '(window:keyup)': 'handleKeyUp($event)',
@@ -644,8 +644,8 @@ import { COLS, ROWS } from './utils/constants';
   }
 })
 export class AppComponent implements OnInit {
-  /** Injected instance of the GameService, which manages all game state and logic. */
-  game = inject(GameService);
+  /** Injected instance of the GameFacade, which provides a simplified interface to the game systems. */
+  game = inject(GameFacade);
 
   /** The dynamically calculated size of a single board cell in pixels. */
   cellSize = signal(32);
@@ -705,20 +705,18 @@ export class AppComponent implements OnInit {
    */
   handleKeyDown(event: KeyboardEvent): void {
     if (event.repeat) return;
-    if (this.game.gameState() === 'gameover' || this.game.isAiming()) {
-      if (this.game.isAiming()) this.game.handleAimerKeys(event.key);
-      return;
-    }
+
+    // Handle global controls like start and pause
     if (this.game.gameState() === 'start' && event.key === 'Enter') {
       this.game.startGame();
       return;
     }
-    if (this.game.gameState() === 'countdown' || this.game.gameState() === 'clearing') return;
-    if (event.key === 'p' || event.key === 'P') {
+    if ((this.game.gameState() === 'playing' || this.game.gameState() === 'paused') && (event.key === 'p' || event.key === 'P')) {
       this.game.togglePause();
       return;
     }
-    if (this.game.gameState() === 'paused') return;
+
+    // Delegate all other game-related key presses to the input service via the facade
     this.game.pressKey(event.key);
   }
 
@@ -1266,267 +1264,267 @@ export class PiecePreviewComponent {
 
 --- END OF FILE: src/components/piece-preview/piece-preview.component.ts ---
 
---- START OF FILE: src/services/game.service.ts ---
-/**
- * @fileoverview Manages the core game state and logic for Tetros.
- */
-import { Injectable, computed, signal } from '@angular/core';
-import { createEmptyBoard, applyGravityToColumn } from '../utils/board.utils';
-import { isValidPosition, clearLines, calculateScore } from '../utils/game-logic.utils';
-import { getRandomPiece, rotate } from '../utils/piece.utils';
-import { Piece } from '../utils/piece.interface';
-import { COLS, LEVEL_THRESHOLD, ROWS } from '../utils/constants';
+--- START OF FILE: src/services/README.md ---
+# Arquitectura de Servicios - Tetros
 
-/** Represents the possible states of the game. */
-type GameState = 'start' | 'playing' | 'paused' | 'gameover' | 'countdown' | 'clearing';
-/** Represents the types of available power-ups. */
-type PowerUp = 'laser' | 'slow' | 'mutate' | 'aimer';
-/** Represents the available animation styles for piece movement. */
-type AnimationMode = 'step' | 'smooth';
+## Flujo de Datos
+Usuario (Teclado/Touch)
+↓
+InputService
+↓
+GameActionsService ←→ BoardService
+↓              ↓
+GameStateService ← AnimationService
+↑
+GameLoopService → GameActionsService
+↑
+PowerUpService
 
-/**
- * Service responsible for all game logic, state management, and player actions.
- */
-@Injectable()
-export class GameService {
-  // --- Game State Signals ---
-  /** The main game board, a 2D array of numbers representing cell states. */
-  board = signal(createEmptyBoard());
-  /** The currently falling piece controlled by the player. */
-  currentPiece = signal<Piece | null>(null);
-  /** The upcoming piece. */
-  nextPiece = signal<Piece | null>(null);
-  /** The piece currently in the hold slot. */
-  holdPiece = signal<Piece | null>(null);
-  /** The current state of the game finite state machine. */
-  gameState = signal<GameState>('start');
-  /** The player's current score. */
-  score = signal(0);
-  /** The current game level, which affects drop speed. */
-  level = signal(1);
-  /** The total number of lines cleared by the player. */
-  linesCleared = signal(0);
-  /** A flag to prevent holding a piece more than once per turn. */
-  isHoldingAllowed = signal(true);
-  /** The value for the pre-game countdown timer. */
-  countdownValue = signal(0);
-  
-  // --- Animation Signals ---
-  /** The selected animation style for piece movement. */
-  animationMode = signal<AnimationMode>('smooth');
-  /** The fractional progress (0-1) of the current piece's fall, used for smooth animation. */
-  dropProgress = signal(0);
-  
-  // --- Power-Up Signals ---
-  /** A map tracking the count of available power-ups. */
-  powerUps = signal<{[key in PowerUp]: number}>({ laser: 1, slow: 1, mutate: 1, aimer: 1 });
-  /** Flag indicating if the 'aimer' power-up is currently active. */
-  isAiming = signal(false);
-  /** The coordinates of the aimer's target on the board. */
-  aimerPosition = signal({ x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) });
-  
-  // --- Private State ---
-  /** Timestamp of the last frame in the game loop. */
-  private lastTime = 0;
-  /** Accumulator for time elapsed since the last automatic drop. */
-  private dropCounter = 0;
-  /** Flag indicating if the 'slow' power-up is active. */
-  private slowMotionActive = false;
-  /** ID of the interval timer for the pre-game countdown. */
-  private countdownIntervalId: any = null;
+## Responsabilidades
 
-  // --- Keyboard Control State (DAS/ARR) ---
-  /** Timer for Delayed Auto-Shift (DAS) delay. */
-  private dasTimer: any = null;
-  /** Timer for Auto-Repeat Rate (ARR) interval. */
-  private arrTimer: any = null;
-  /** Timer for soft drop auto-repeat. */
-  private readonly dasDelay = 160; // ms
-  private readonly arrInterval = 40;  // ms
-  private softDropInterval: any = null;
+### GameStateService
+- Single source of truth para todo el estado del juego
+- Solo contiene signals, sin lógica de negocio
+- No tiene dependencias con otros servicios
 
+### BoardService
+- Operaciones sobre el tablero (clear lines, apply gravity)
+- Lee y modifica el estado a través de GameStateService
+
+### AnimationService
+- Cálculo del ghost piece
+- Control de modos de animación (smooth/step)
+- Cálculo de posiciones visuales
+
+### GameActionsService
+- Lógica core del juego (mover, rotar, lock piece)
+- Orquesta cambios entre Board y State
+- Valida movimientos
+
+### GameLoopService
+- Motor temporal con requestAnimationFrame
+- Controla velocidad de caída según nivel
+- Maneja el drop automático
+
+### InputService
+- Traducción de teclas a acciones
+- Implementación de DAS/ARR
+- No conoce reglas del juego
+
+### PowerUpService
+- Sistema modular de power-ups
+- Cada power-up como estrategia independiente
+
+### GameFacade
+- Orquestador principal
+- Expone API pública para componentes
+- Maneja inicio/pausa/reinicio del juego
+
+## Testing
+
+Para testear un servicio individual:
+1. Mock sus dependencias
+2. Test de estado inicial
+3. Test de cada método público
+4. Test de edge cases
+
+## Agregar Nuevas Features
+
+Para agregar un nuevo power-up:
+1. Añadir tipo en GameStateService
+2. Implementar lógica en PowerUpService
+3. Mapear tecla en InputService (opcional)
+
+--- END OF FILE: src/services/README.md ---
+
+--- START OF FILE: src/services/animation.service.ts ---
+import { Injectable, computed, inject } from '@angular/core';
+import { GameStateService } from './game-state.service';
+import { isValidPosition } from '../utils/game-logic.utils';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AnimationService {
+  private state = inject(GameStateService);
 
   /**
    * A computed signal that calculates the position of the ghost piece.
    * The ghost piece shows where the current piece will land.
    */
   ghostPiece = computed(() => {
-    const piece = this.currentPiece();
-    if (!piece || this.gameState() !== 'playing') return null;
+    const piece = this.state.currentPiece();
+    const board = this.state.board();
 
+    // Do not show ghost piece if game is not in a playable state.
+    if (!piece || this.state.gameState() !== 'playing') {
+      return null;
+    }
+
+    // Create a copy of the piece to mutate.
     let ghost = { ...piece, shape: piece.shape.map(row => [...row]) };
-    while (isValidPosition(ghost, this.board())) {
+
+    // Drop the ghost piece down until it hits something.
+    while (isValidPosition(ghost, board)) {
       ghost.y++;
     }
+
+    // Move it back up one step to its final valid position.
     ghost.y--;
+
     return ghost;
   });
 
   /**
-   * Checks if a specific power-up can be used.
-   * @param powerUp The power-up to check.
-   * @returns `true` if the power-up can be used, otherwise `false`.
+   * Toggles the animation mode between 'smooth' and 'step' in the game state.
    */
-  canUsePowerUp(powerUp: PowerUp): boolean {
-    return this.powerUps()[powerUp] > 0 && this.gameState() === 'playing' && !this.isAiming();
+  toggleAnimationMode(): void {
+    this.state.animationMode.update(current => current === 'smooth' ? 'step' : 'smooth');
   }
+}
+
+--- END OF FILE: src/services/animation.service.ts ---
+
+--- START OF FILE: src/services/board.service.ts ---
+import { Injectable, inject } from '@angular/core';
+import { GameStateService } from './game-state.service';
+import { clearLines } from '../utils/game-logic.utils';
+import { Piece } from '../utils/piece.interface';
+import { applyGravityToColumn } from '../utils/board.utils';
+import { COLS } from '../utils/constants';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class BoardService {
+  private state = inject(GameStateService);
 
   /**
-   * Initializes or restarts the game, resetting all state variables and starting the countdown.
+   * Creates a new board matrix with a piece permanently added.
+   * @param piece The piece to add.
+   * @param board The board to add the piece to.
+   * @returns A new 2D array representing the board.
    */
-  startGame(): void {
-    if (this.countdownIntervalId) {
-        clearInterval(this.countdownIntervalId);
-        this.countdownIntervalId = null;
-    }
-    // Clear any active movement timers from a previous game
-    if (this.dasTimer) clearTimeout(this.dasTimer);
-    if (this.arrTimer) clearInterval(this.arrTimer);
-    if (this.softDropInterval) clearInterval(this.softDropInterval);
-    this.dasTimer = null;
-    this.arrTimer = null;
-    this.softDropInterval = null;
-
-
-    this.board.set(createEmptyBoard());
-    this.currentPiece.set(getRandomPiece());
-    this.nextPiece.set(getRandomPiece());
-    this.holdPiece.set(null);
-    this.score.set(0);
-    this.level.set(1);
-    this.linesCleared.set(0);
-    this.isHoldingAllowed.set(true);
-    this.powerUps.set({ laser: 1, slow: 1, mutate: 1, aimer: 1 });
-    this.isAiming.set(false);
-    this.aimerPosition.set({ x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) });
-    this.slowMotionActive = false;
-
-    this.gameState.set('countdown');
-    this.countdownValue.set(3);
-
-    this.countdownIntervalId = setInterval(() => {
-      this.countdownValue.update(v => v - 1);
-      if (this.countdownValue() <= 0) {
-        if(this.countdownIntervalId) clearInterval(this.countdownIntervalId);
-        this.countdownIntervalId = null;
-        this.gameState.set('playing');
-        this.lastTime = 0;
-        this.dropCounter = 0;
-        this.dropProgress.set(0);
-        requestAnimationFrame((time) => this.gameLoop(time));
-      }
-    }, 1000);
-  }
-
-  /**
-   * Toggles the game between 'playing' and 'paused' states.
-   */
-  togglePause(): void {
-    if (this.gameState() === 'playing') {
-      this.gameState.set('paused');
-    } else if (this.gameState() === 'paused') {
-      this.gameState.set('playing');
-      this.lastTime = 0; // Reset time to avoid a sudden drop
-      requestAnimationFrame((time) => this.gameLoop(time));
-    }
-  }
-
-  /**
-   * The main game loop, driven by `requestAnimationFrame`.
-   * It calculates delta time to handle piece dropping and animations.
-   * @param time The high-resolution timestamp provided by `requestAnimationFrame`.
-   */
-  private gameLoop(time: number): void {
-    if (this.gameState() !== 'playing') return;
-
-    if (this.lastTime === 0) {
-      this.lastTime = time;
-    }
-    const deltaTime = time - this.lastTime;
-    this.lastTime = time;
-    this.dropCounter += deltaTime;
-    
-    const dropInterval = (1000 / this.level()) * (this.slowMotionActive ? 3 : 1);
-
-    if (!this.softDropInterval) {
-      while (this.dropCounter >= dropInterval) {
-        this.moveDown();
-        if (this.gameState() !== 'playing') {
-          this.dropProgress.set(0);
-          return; // Exit loop if game state changes (e.g., game over)
+  getBoardWithPiece(piece: Piece, board: number[][]): number[][] {
+    const newBoard = board.map(row => [...row]);
+    piece.shape.forEach((row, y) => {
+      row.forEach((value, x) => {
+        if (value > 0) {
+          const boardX = piece.x + x;
+          const boardY = piece.y + y;
+          if (boardY >= 0) {
+            newBoard[boardY][boardX] = value;
+          }
         }
-        this.dropCounter -= dropInterval;
-      }
-    }
-
-    if (this.currentPiece()) {
-      // If the piece is resting on something, don't apply drop progress to prevent visual overshoot.
-      if (this.canMoveDown()) {
-        this.dropProgress.set(Math.min(1, this.dropCounter / dropInterval));
-      } else {
-        this.dropProgress.set(0);
-      }
-    } else {
-      this.dropProgress.set(0);
-    }
-
-    requestAnimationFrame((t) => this.gameLoop(t));
+      });
+    });
+    return newBoard;
   }
 
   /**
-   * Moves the current piece one cell to the left, if possible.
+   * Processes a board, clearing any completed lines. It relies on a utility function
+   * to perform the actual clearing.
+   * @param board The board to process.
+   * @returns An object containing the new board and the number of lines cleared.
    */
-  moveLeft(): void {
-    this.movePiece(-1, 0);
+  clearCompletedLines(board: number[][]): { boardAfterClear: number[][], linesCleared: number } {
+    const { boardAfterClear, lines } = clearLines(board);
+    return { boardAfterClear, linesCleared: lines };
   }
 
   /**
-   * Moves the current piece one cell to the right, if possible.
+   * Applies gravity to a single column of the current board state and updates the board.
+   * Used by the 'aimer' power-up.
+   * @param columnIndex The index of the column to apply gravity to.
    */
-  moveRight(): void {
-    this.movePiece(1, 0);
-  }
-  
-  /**
-   * Moves the current piece one cell down (soft drop).
-   */
-  softDrop(): void {
-    this.moveDown();
-    this.dropCounter = 0; // Reset counter for immediate feedback
-    this.dropProgress.set(0);
+  applyGravityToColumn(columnIndex: number): void {
+    this.state.board.update(board => {
+        const newBoard = board.map(row => [...row]);
+        applyGravityToColumn(newBoard, columnIndex);
+        return newBoard;
+    });
   }
 
   /**
-   * Instantly drops the current piece to its final position and locks it.
+   * Clears a specific row on the board. Used by the 'laser' power-up.
+   * @param rowIndex The index of the row to clear.
    */
-  hardDrop(): void {
-    const piece = this.currentPiece();
-    const ghost = this.ghostPiece();
-    if (piece && ghost) {
-      const droppedPiece = { ...piece, y: ghost.y };
-      this.currentPiece.set(droppedPiece);
+  clearRow(rowIndex: number): void {
+    this.state.board.update(board => {
+        const newBoard = board.map(row => [...row]);
+        if (newBoard[rowIndex]) {
+            newBoard[rowIndex] = new Array(COLS).fill(0);
+        }
+        return newBoard;
+    });
+  }
+}
+
+--- END OF FILE: src/services/board.service.ts ---
+
+--- START OF FILE: src/services/game-actions.service.ts ---
+import { Injectable, inject } from '@angular/core';
+import { GameStateService } from './game-state.service';
+import { BoardService } from './board.service';
+import { AnimationService } from './animation.service';
+import { Piece } from '../utils/piece.interface';
+import { getRandomPiece, rotate } from '../utils/piece.utils';
+import { isValidPosition, calculateScore } from '../utils/game-logic.utils';
+import { LEVEL_THRESHOLD, COLS, LINE_CLEAR_ANIMATION_DURATION } from '../utils/constants';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class GameActionsService {
+  private state = inject(GameStateService);
+  private boardService = inject(BoardService);
+  private animationService = inject(AnimationService);
+
+  /**
+   * The main tick of the game, attempting to move the piece down.
+   * If the piece cannot move down, it gets locked.
+   * This is intended to be called by the GameLoopService.
+   */
+  tick(): void {
+    if (!this.movePiece(0, 1)) {
       this.lockPiece();
     }
   }
 
-  /**
-   * Rotates the current piece clockwise, applying wall kicks if necessary.
-   */
+  // --- Player Actions ---
+
+  moveLeft(): void {
+    this.movePiece(-1, 0);
+  }
+
+  moveRight(): void {
+    this.movePiece(1, 0);
+  }
+
+  softDrop(): void {
+    this.tick();
+    // The drop counter reset will be handled by the game loop service
+    // to avoid a dependency from Actions -> Loop.
+    this.state.dropProgress.set(0);
+  }
+
+  hardDrop(): void {
+    const piece = this.state.currentPiece();
+    const ghost = this.animationService.ghostPiece();
+    if (piece && ghost) {
+      this.state.currentPiece.set({ ...piece, y: ghost.y });
+      this.lockPiece();
+    }
+  }
+
   rotate(): void {
-    const piece = this.currentPiece();
+    const piece = this.state.currentPiece();
     if (!piece) return;
 
     const rotatedPiece = rotate(piece);
-
-    // Try to find a valid position by "kicking" the piece.
-    // This is a simplified wall kick, not full SRS.
     const kicks = [
-      { x: 0, y: 0 },   // No kick
-      { x: 1, y: 0 },   // Kick right 1
-      { x: -1, y: 0 },  // Kick left 1
-      { x: 2, y: 0 },   // Kick right 2 (for I piece)
-      { x: -2, y: 0 },  // Kick left 2 (for I piece)
-      { x: 0, y: -1 }   // Kick up 1
+      { x: 0, y: 0 }, { x: 1, y: 0 }, { x: -1, y: 0 },
+      { x: 2, y: 0 }, { x: -2, y: 0 }, { x: 0, y: -1 }
     ];
 
     for (const kick of kicks) {
@@ -1535,90 +1533,47 @@ export class GameService {
         x: rotatedPiece.x + kick.x,
         y: rotatedPiece.y + kick.y
       };
-
-      if (isValidPosition(kickedPiece, this.board())) {
-        this.currentPiece.set(kickedPiece);
-        return; // Rotation successful
+      if (isValidPosition(kickedPiece, this.state.board())) {
+        this.state.currentPiece.set(kickedPiece);
+        return;
       }
     }
-    // If no kick works, rotation fails.
   }
 
-  /**
-   * Swaps the current piece with the piece in the hold slot.
-   */
   hold(): void {
-    if (!this.isHoldingAllowed() || this.gameState() !== 'playing') return;
-    const current = this.currentPiece();
-    const held = this.holdPiece();
+    if (!this.state.isHoldingAllowed() || this.state.gameState() !== 'playing') return;
 
-    this.holdPiece.set({...current!, x: 3, y: 0});
+    const current = this.state.currentPiece();
+    const held = this.state.holdPiece();
+
+    this.state.holdPiece.set({ ...current!, x: 3, y: 0 });
     if (held) {
-        this.currentPiece.set({...held, x: 3, y: 0});
+      this.state.currentPiece.set({ ...held, x: 3, y: 0 });
     } else {
-        this.spawnNewPiece();
+      this.spawnNewPiece();
     }
-    this.isHoldingAllowed.set(false);
+    this.state.isHoldingAllowed.set(false);
   }
 
-  /**
-   * Checks if the current piece can move one cell down.
-   * @returns `true` if the piece can move down, `false` otherwise.
-   */
-  private canMoveDown(): boolean {
-    const piece = this.currentPiece();
-    if (!piece) return false;
-    const newPiece = { ...piece, y: piece.y + 1 };
-    return isValidPosition(newPiece, this.board());
-  }
+  // --- Internal Game Logic ---
 
-  /**
-   * Attempts to move the piece one step down. If it fails, the piece is locked.
-   */
-  private moveDown(): void {
-    if (this.movePiece(0, 1)) {
-        // Piece moved down successfully
-    } else {
-        this.lockPiece();
-    }
-  }
-  
-  /**
-   * Attempts to move the current piece by a given delta.
-   * @param dx The change in the x-coordinate.
-   * @param dy The change in the y-coordinate.
-   * @returns `true` if the move was successful, `false` otherwise.
-   */
   private movePiece(dx: number, dy: number): boolean {
-    const piece = this.currentPiece();
+    const piece = this.state.currentPiece();
     if (!piece) return false;
+
     const newPiece = { ...piece, x: piece.x + dx, y: piece.y + dy };
-    if (isValidPosition(newPiece, this.board())) {
-      this.currentPiece.set(newPiece);
+    if (isValidPosition(newPiece, this.state.board())) {
+      this.state.currentPiece.set(newPiece);
       return true;
     }
     return false;
   }
 
-  /**
-   * Locks the current piece onto the board, checks for line clears, and spawns the next piece.
-   */
   private lockPiece(): void {
-    const piece = this.currentPiece();
+    const piece = this.state.currentPiece();
     if (!piece) return;
 
-    const boardWithPiece = this.board().map(row => [...row]);
-    piece.shape.forEach((row, y) => {
-      row.forEach((value, x) => {
-        if (value > 0) {
-          const boardX = piece.x + x;
-          const boardY = piece.y + y;
-          if(boardY >= 0) {
-            boardWithPiece[boardY][boardX] = value;
-          }
-        }
-      });
-    });
+    const boardWithPiece = this.boardService.getBoardWithPiece(piece, this.state.board());
 
     const linesToClear: number[] = [];
     boardWithPiece.forEach((row, y) => {
@@ -1628,99 +1583,492 @@ export class GameService {
     });
 
     if (linesToClear.length > 0) {
-        this.gameState.set('clearing');
-        this.currentPiece.set(null);
+      this.state.gameState.set('clearing');
+      this.state.currentPiece.set(null);
 
-        const animationBoard = boardWithPiece.map((row, y) => {
-            if (linesToClear.includes(y)) {
-                return Array(COLS).fill(-3); // -3 for clearing animation
-            }
-            return row;
-        });
-        this.board.set(animationBoard);
+      const animationBoard = boardWithPiece.map((row, y) => {
+        if (linesToClear.includes(y)) {
+          return Array(COLS).fill(-3); // Use special value for clearing animation
+        }
+        return row;
+      });
+      this.state.board.set(animationBoard);
 
-        setTimeout(() => {
-            const { boardAfterClear, lines } = clearLines(boardWithPiece);
-            this.board.set(boardAfterClear);
+      setTimeout(() => {
+        const { boardAfterClear, linesCleared } = this.boardService.clearCompletedLines(boardWithPiece);
+        this.state.board.set(boardAfterClear);
 
-            if (lines > 0) {
-                this.score.update(s => s + calculateScore(lines, this.level()));
-                this.linesCleared.update(l => l + lines);
-                this.level.set(Math.floor(this.linesCleared() / LEVEL_THRESHOLD) + 1);
-                this.powerUps.update(p => ({ laser: p.laser+1, slow: p.slow+1, mutate: p.mutate+1, aimer: p.aimer+1 }));
-            }
+        this.state.score.update(s => s + calculateScore(linesCleared, this.state.level()));
+        this.state.linesCleared.update(l => l + linesCleared);
+        this.state.level.set(Math.floor(this.state.linesCleared() / LEVEL_THRESHOLD) + 1);
+        this.state.powerUps.update(p => ({ laser: p.laser + 1, slow: p.slow + 1, mutate: p.mutate + 1, aimer: p.aimer + 1 }));
 
-            this.spawnNewPiece();
-            this.isHoldingAllowed.set(true);
-            this.gameState.set('playing');
-            this.lastTime = 0;
-            requestAnimationFrame((time) => this.gameLoop(time));
-        }, 300); // Animation duration
-    } else {
-        this.board.set(boardWithPiece);
         this.spawnNewPiece();
-        this.isHoldingAllowed.set(true);
+        this.state.isHoldingAllowed.set(true);
+        this.state.gameState.set('playing');
+      }, LINE_CLEAR_ANIMATION_DURATION);
+    } else {
+      this.state.board.set(boardWithPiece);
+      this.spawnNewPiece();
+      this.state.isHoldingAllowed.set(true);
     }
   }
 
-  /**
-   * Spawns the next piece at the top of the board. Ends the game if the new piece is invalid.
-   */
   private spawnNewPiece(): void {
-    this.dropCounter = 0;
-    this.dropProgress.set(0);
-    this.currentPiece.set(this.nextPiece());
-    this.nextPiece.set(getRandomPiece());
+    this.state.dropProgress.set(0);
+    this.state.currentPiece.set(this.state.nextPiece());
+    this.state.nextPiece.set(getRandomPiece());
 
-    if (!isValidPosition(this.currentPiece()!, this.board())) {
-        this.gameState.set('gameover');
+    if (!isValidPosition(this.state.currentPiece()!, this.state.board())) {
+      this.state.gameState.set('gameover');
     }
   }
-  
-  /**
-   * Activates a specified power-up if available.
-   * @param powerUp The power-up to activate.
-   */
-  activatePowerUp(powerUp: PowerUp): void {
-      if (!this.canUsePowerUp(powerUp)) return;
-      
-      this.powerUps.update(p => ({...p, [powerUp]: p[powerUp] - 1}));
 
-      switch(powerUp) {
-          case 'laser':
-            const piece = this.currentPiece();
-            if(!piece) return;
-            const y = Math.min(ROWS - 1, piece.y + piece.shape.length);
-            this.board.update(b => {
-                const newBoard = b.map(row => [...row]);
-                newBoard[y] = new Array(COLS).fill(0);
-                return newBoard;
-            });
-            break;
-          case 'slow':
-            this.slowMotionActive = true;
-            setTimeout(() => this.slowMotionActive = false, 5000);
-            break;
-          case 'mutate':
-            this.currentPiece.set(getRandomPiece());
-            this.nextPiece.set(getRandomPiece());
-            break;
-          case 'aimer':
-            this.isAiming.set(true);
-            this.gameState.set('paused'); // Pause game loop
-            this.updateAimerBoard();
-            break;
+  /**
+   * Checks if the current piece can move down.
+   * Public so other services (like GameLoop) can use it for calculations.
+   */
+  public canMoveDown(): boolean {
+    const piece = this.state.currentPiece();
+    if (!piece) return false;
+    const newPiece = { ...piece, y: piece.y + 1 };
+    return isValidPosition(newPiece, this.state.board());
+  }
+}
+
+--- END OF FILE: src/services/game-actions.service.ts ---
+
+--- START OF FILE: src/services/game-loop.service.ts ---
+import { Injectable, inject, effect } from '@angular/core';
+import { GameStateService } from './game-state.service';
+import { GameActionsService } from './game-actions.service';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class GameLoopService {
+  private state = inject(GameStateService);
+  private actions = inject(GameActionsService);
+
+  private lastTime = 0;
+  private dropCounter = 0;
+  private frameId: number | null = null;
+
+  constructor() {
+    // Este effect observa el signal softDropActive para resetear el contador
+    // cuando el usuario inicia un soft drop manual, evitando drops dobles
+    // al sincronizar el drop manual con el automático del game loop
+    effect(() => {
+      if (this.state.softDropActive()) {
+        this.resetCounter();
       }
+    });
+  }
+
+  start(): void {
+    if (this.frameId) return;
+    // Don't reset time here, let the caller decide.
+    this.frameId = requestAnimationFrame((time) => this.loop(time));
+  }
+
+  stop(): void {
+    if (this.frameId) {
+      cancelAnimationFrame(this.frameId);
+    }
+    this.frameId = null;
+  }
+
+  resetTime(): void {
+    this.lastTime = 0;
+  }
+
+  private resetCounter(): void {
+    this.dropCounter = 0;
+  }
+
+  private loop(time: number): void {
+    if (this.state.gameState() !== 'playing') {
+      this.stop();
+      return;
+    }
+
+    if (this.lastTime === 0) {
+      this.lastTime = time;
+    }
+    const deltaTime = time - this.lastTime;
+    this.lastTime = time;
+    this.dropCounter += deltaTime;
+
+    const dropInterval = (1000 / this.state.level()) * (this.state.slowMotionActive() ? 3 : 1);
+
+    if (!this.state.softDropActive()) {
+      while (this.dropCounter >= dropInterval) {
+        this.actions.tick();
+        if (this.state.gameState() !== 'playing') {
+          this.state.dropProgress.set(0);
+          this.stop();
+          return;
+        }
+        this.dropCounter -= dropInterval;
+      }
+    }
+
+    if (this.state.currentPiece()) {
+      if (this.actions.canMoveDown()) {
+        this.state.dropProgress.set(Math.min(1, this.dropCounter / dropInterval));
+      } else {
+        this.state.dropProgress.set(0);
+      }
+    } else {
+      this.state.dropProgress.set(0);
+    }
+
+    this.frameId = requestAnimationFrame((t) => this.loop(t));
+  }
+}
+
+--- END OF FILE: src/services/game-loop.service.ts ---
+
+--- START OF FILE: src/services/game-state.service.ts ---
+import { Injectable, signal } from '@angular/core';
+import { createEmptyBoard } from '../utils/board.utils';
+import { Piece } from '../utils/piece.interface';
+import { COLS, ROWS } from '../utils/constants';
+
+// Type Definitions
+export type GameState = 'start' | 'playing' | 'paused' | 'gameover' | 'countdown' | 'clearing';
+export type PowerUp = 'laser' | 'slow' | 'mutate' | 'aimer';
+export type AnimationMode = 'step' | 'smooth';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class GameStateService {
+  // --- Game State Signals ---
+  board = signal(createEmptyBoard());
+  currentPiece = signal<Piece | null>(null);
+  nextPiece = signal<Piece | null>(null);
+  holdPiece = signal<Piece | null>(null);
+  gameState = signal<GameState>('start');
+  score = signal(0);
+  level = signal(1);
+  linesCleared = signal(0);
+  isHoldingAllowed = signal(true);
+  /** Flag to indicate if the user is actively holding the soft drop key. */
+  softDropActive = signal(false);
+  countdownValue = signal(0);
+
+  // --- Animation Signals ---
+  animationMode = signal<AnimationMode>('smooth');
+  dropProgress = signal(0);
+
+  // --- Power-Up Signals ---
+  powerUps = signal<{[key in PowerUp]: number}>({ laser: 1, slow: 1, mutate: 1, aimer: 1 });
+  isAiming = signal(false);
+  aimerPosition = signal({ x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) });
+  slowMotionActive = signal(false);
+
+  constructor() { }
+}
+
+--- END OF FILE: src/services/game-state.service.ts ---
+
+--- START OF FILE: src/services/game.facade.ts ---
+import { Injectable, inject } from '@angular/core';
+import { GameStateService, PowerUp } from './game-state.service';
+import { GameActionsService } from './game-actions.service';
+import { GameLoopService } from './game-loop.service';
+import { InputService } from './input.service';
+import { PowerUpService } from './power-up.service';
+import { AnimationService } from './animation.service';
+import { createEmptyBoard } from '../utils/board.utils';
+import { getRandomPiece } from '../utils/piece.utils';
+import { COLS, ROWS } from '../utils/constants';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class GameFacade {
+  private state = inject(GameStateService);
+  private actions = inject(GameActionsService);
+  private loop = inject(GameLoopService);
+  private input = inject(InputService);
+  private powerUpService = inject(PowerUpService);
+  private animation = inject(AnimationService);
+
+  private countdownIntervalId: any = null;
+
+  // --- State Signals (exposed as readonly) ---
+  readonly board = this.state.board.asReadonly();
+  readonly currentPiece = this.state.currentPiece.asReadonly();
+  readonly nextPiece = this.state.nextPiece.asReadonly();
+  readonly holdPiece = this.state.holdPiece.asReadonly();
+  readonly gameState = this.state.gameState.asReadonly();
+  readonly score = this.state.score.asReadonly();
+  readonly level = this.state.level.asReadonly();
+  readonly linesCleared = this.state.linesCleared.asReadonly();
+  readonly countdownValue = this.state.countdownValue.asReadonly();
+  readonly powerUps = this.state.powerUps.asReadonly();
+  readonly isAiming = this.state.isAiming.asReadonly();
+  readonly dropProgress = this.state.dropProgress.asReadonly();
+  readonly animationMode = this.state.animationMode.asReadonly();
+  readonly ghostPiece = this.animation.ghostPiece;
+
+  // --- Action Methods (for touch controls) ---
+  readonly moveLeft = this.actions.moveLeft.bind(this.actions);
+  readonly moveRight = this.actions.moveRight.bind(this.actions);
+  readonly softDrop = this.actions.softDrop.bind(this.actions);
+  readonly hardDrop = this.actions.hardDrop.bind(this.actions);
+  readonly rotate = this.actions.rotate.bind(this.actions);
+  readonly hold = this.actions.hold.bind(this.actions);
+
+  // --- Input Methods (for keyboard controls) ---
+  pressKey(key: string): void {
+    if (this.state.isAiming()) {
+      this.powerUpService.handleAimerKeys(key);
+
+      if (key === 'Enter') {
+        this.loop.resetTime();
+        this.loop.start();
+      }
+    } else {
+      this.input.press(key);
+    }
+  }
+  releaseKey(key: string) { this.input.release(key); }
+
+  // --- PowerUp Methods ---
+  activatePowerUp(powerUp: PowerUp) { this.powerUpService.activatePowerUp(powerUp); }
+  canUsePowerUp = this.powerUpService.canUsePowerUp.bind(this.powerUpService);
+
+  // --- Animation Methods ---
+  toggleAnimationMode() { this.animation.toggleAnimationMode(); }
+
+  // --- Orchestration Methods ---
+  startGame(): void {
+    if (this.countdownIntervalId) {
+      clearInterval(this.countdownIntervalId);
+    }
+    this.input.clearTimers();
+    this.powerUpService.reset();
+
+    // Reset all state
+    this.state.board.set(createEmptyBoard());
+    this.state.currentPiece.set(getRandomPiece());
+    this.state.nextPiece.set(getRandomPiece());
+    this.state.holdPiece.set(null);
+    this.state.score.set(0);
+    this.state.level.set(1);
+    this.state.linesCleared.set(0);
+    this.state.isHoldingAllowed.set(true);
+    this.state.powerUps.set({ laser: 1, slow: 1, mutate: 1, aimer: 1 });
+    this.state.isAiming.set(false);
+    this.state.aimerPosition.set({ x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) });
+    this.state.dropProgress.set(0);
+
+    this.state.gameState.set('countdown');
+    this.state.countdownValue.set(3);
+
+    this.countdownIntervalId = setInterval(() => {
+      this.state.countdownValue.update(v => v - 1);
+      if (this.state.countdownValue() <= 0) {
+        clearInterval(this.countdownIntervalId);
+        this.countdownIntervalId = null;
+        this.state.gameState.set('playing');
+        this.loop.resetTime();
+        this.loop.start();
+      }
+    }, 1000);
+  }
+
+  togglePause(): void {
+    if (this.state.gameState() === 'playing') {
+      this.state.gameState.set('paused');
+      this.loop.stop();
+      this.input.clearTimers();
+    } else if (this.state.gameState() === 'paused') {
+      this.state.gameState.set('playing');
+      this.loop.resetTime(); // Prevent sudden drop after unpausing
+      this.loop.start();
+    }
+  }
+}
+
+--- END OF FILE: src/services/game.facade.ts ---
+
+--- START OF FILE: src/services/input.service.ts ---
+import { Injectable, inject } from '@angular/core';
+import { GameActionsService } from './game-actions.service';
+import { PowerUpService } from './power-up.service';
+import { GameStateService } from './game-state.service';
+import { DAS_DELAY, ARR_INTERVAL } from '../utils/constants';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class InputService {
+  private actions = inject(GameActionsService);
+  private powerUps = inject(PowerUpService);
+  private state = inject(GameStateService);
+
+  // Timers for Delayed Auto-Shift (DAS) and Auto-Repeat Rate (ARR)
+  private dasTimer: any = null;
+  private arrTimer: any = null;
+  private softDropInterval: any = null;
+
+  /**
+   * Handles a key press event.
+   * @param key The key identifier from a KeyboardEvent.
+   */
+  press(key: string): void {
+    if (this.state.isAiming()) {
+      this.powerUps.handleAimerKeys(key);
+      return;
+    }
+    if (this.state.gameState() !== 'playing') return;
+
+    switch (key) {
+      case 'ArrowLeft':
+      case 'ArrowRight':
+        if (this.dasTimer || this.arrTimer) return;
+        const move = () => key === 'ArrowLeft' ? this.actions.moveLeft() : this.actions.moveRight();
+        move();
+        this.dasTimer = setTimeout(() => {
+          this.arrTimer = setInterval(move, ARR_INTERVAL);
+        }, DAS_DELAY);
+        break;
+      case 'ArrowDown':
+        if (this.softDropInterval) return;
+        this.state.softDropActive.set(true);
+        this.actions.softDrop();
+        this.softDropInterval = setInterval(() => {
+            this.actions.softDrop();
+        }, ARR_INTERVAL);
+        break;
+      case 'ArrowUp':
+        this.actions.rotate();
+        break;
+      case ' ': // Spacebar
+        this.actions.hardDrop();
+        break;
+      case 'c':
+      case 'C':
+        this.actions.hold();
+        break;
+      case '1': this.powerUps.activatePowerUp('laser'); break;
+      case '2': this.powerUps.activatePowerUp('slow'); break;
+      case '3': this.powerUps.activatePowerUp('mutate'); break;
+      case '4': this.powerUps.activatePowerUp('aimer'); break;
+    }
   }
 
   /**
-   * Handles keyboard input when the 'aimer' power-up is active.
-   * @param key The key that was pressed (e.g., 'ArrowLeft', 'Enter').
+   * Handles a key release event.
+   * @param key The key identifier from a KeyboardEvent.
    */
-  handleAimerKeys(key: string): void {
-    if (!this.isAiming()) return;
+  release(key: string): void {
+    switch (key) {
+      case 'ArrowLeft':
+      case 'ArrowRight':
+        clearTimeout(this.dasTimer);
+        clearInterval(this.arrTimer);
+        this.dasTimer = null;
+        this.arrTimer = null;
+        break;
+      case 'ArrowDown':
+        clearInterval(this.softDropInterval);
+        this.softDropInterval = null;
+        this.state.softDropActive.set(false);
+        break;
+    }
+  }
 
-    this.aimerPosition.update(pos => {
+  /**
+   * Clears all active movement timers. Useful when the game is paused or reset.
+   */
+  clearTimers(): void {
+    clearTimeout(this.dasTimer);
+    clearInterval(this.arrTimer);
+    clearInterval(this.softDropInterval);
+    this.dasTimer = null;
+    this.arrTimer = null;
+    this.softDropInterval = null;
+    if(this.state.softDropActive()) {
+        this.state.softDropActive.set(false);
+    }
+  }
+}
+
+--- END OF FILE: src/services/input.service.ts ---
+
+--- START OF FILE: src/services/power-up.service.ts ---
+import { Injectable, inject } from '@angular/core';
+import { GameStateService, PowerUp } from './game-state.service';
+import { BoardService } from './board.service';
+import { getRandomPiece } from '../utils/piece.utils';
+import { ROWS, COLS, SLOW_POWERUP_DURATION } from '../utils/constants';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class PowerUpService {
+  private state = inject(GameStateService);
+  private boardService = inject(BoardService);
+
+  /** Resets the internal state of the service. */
+  reset(): void {
+    this.state.slowMotionActive.set(false);
+  }
+
+  canUsePowerUp(powerUp: PowerUp): boolean {
+    return this.state.powerUps()[powerUp] > 0 && this.state.gameState() === 'playing' && !this.state.isAiming();
+  }
+
+  activatePowerUp(powerUp: PowerUp): void {
+    if (!this.canUsePowerUp(powerUp)) return;
+
+    this.state.powerUps.update(p => ({...p, [powerUp]: p[powerUp] - 1}));
+
+    switch(powerUp) {
+      case 'laser':
+        const piece = this.state.currentPiece();
+        if (!piece) return;
+        // Find the lowest occupied row of the piece for more accurate targeting
+        let bottomRow = piece.y;
+        for (let row = piece.shape.length - 1; row >= 0; row--) {
+          if (piece.shape[row].some(cell => cell > 0)) {
+            bottomRow = piece.y + row;
+            break;
+          }
+        }
+        const y = Math.min(ROWS - 1, bottomRow + 1); // +1 to destroy the row just below the piece
+        this.boardService.clearRow(y);
+        break;
+      case 'slow':
+        this.state.slowMotionActive.set(true);
+        setTimeout(() => this.state.slowMotionActive.set(false), SLOW_POWERUP_DURATION);
+        break;
+      case 'mutate':
+        this.state.currentPiece.set(getRandomPiece());
+        this.state.nextPiece.set(getRandomPiece());
+        break;
+      case 'aimer':
+        this.state.isAiming.set(true);
+        this.state.gameState.set('paused');
+        this.updateAimerBoard();
+        break;
+    }
+  }
+
+  handleAimerKeys(key: string): void {
+    if (!this.state.isAiming()) return;
+
+    if (key === 'Enter') {
+      this.executeAimer();
+      return;
+    }
+
+    this.state.aimerPosition.update(pos => {
       let { x, y } = pos;
       if (key === 'ArrowLeft') x = Math.max(0, x - 1);
       if (key === 'ArrowRight') x = Math.min(COLS - 1, x + 1);
@@ -1729,118 +2077,40 @@ export class GameService {
       return { x, y };
     });
     this.updateAimerBoard();
-
-    if (key === 'Enter') {
-      this.executeAimer();
-    }
   }
 
-  /**
-   * Updates the visual representation of the aimer's target on the board.
-   */
   private updateAimerBoard(): void {
-    const { x, y } = this.aimerPosition();
-    this.board.update(b => {
+    const { x, y } = this.state.aimerPosition();
+    this.state.board.update(b => {
       const newBoard = b.map(row => row.map(cell => cell === -2 ? 0 : cell));
-      if (newBoard[y][x] !== -2) {
+      if (newBoard[y] && newBoard[y][x] !== undefined) {
         newBoard[y][x] = -2;
       }
       return newBoard;
     });
   }
 
-  /**
-   * Executes the 'aimer' power-up, destroying the targeted cell and applying gravity.
-   */
   private executeAimer(): void {
-    this.isAiming.set(false);
-    this.gameState.set('playing');
-    const { x, y } = this.aimerPosition();
+    this.state.isAiming.set(false);
+    const { x, y } = this.state.aimerPosition();
 
-    this.board.update(b => {
+    // First, clean the visual marker and destroy the target cell
+    this.state.board.update(b => {
       const newBoard = b.map(row => row.map(cell => cell === -2 ? 0 : cell));
-      newBoard[y][x] = 0; // Destroy cell
-      applyGravityToColumn(newBoard, x);
+      if (newBoard[y] && newBoard[y][x] !== undefined) {
+        newBoard[y][x] = 0; // Destroy the target cell
+      }
       return newBoard;
     });
-    
-    this.lastTime = 0;
-    requestAnimationFrame((time) => this.gameLoop(time));
-  }
 
-  /**
-   * Toggles the animation mode between 'smooth' and 'step'.
-   */
-  toggleAnimationMode(): void {
-    this.animationMode.update(current => current === 'smooth' ? 'step' : 'smooth');
-  }
+    // Then apply gravity to the column
+    this.boardService.applyGravityToColumn(x);
 
-  /**
-   * Handles the initial press of a key for movement, implementing DAS/ARR logic.
-   * @param key The string identifier of the key that was pressed.
-   */
-  pressKey(key: string): void {
-    switch (key) {
-        case 'ArrowLeft':
-        case 'ArrowRight':
-            if (this.dasTimer || this.arrTimer) return;
-            const move = () => key === 'ArrowLeft' ? this.moveLeft() : this.moveRight();
-            move();
-            this.dasTimer = setTimeout(() => {
-                this.arrTimer = setInterval(move, this.arrInterval);
-            }, this.dasDelay);
-            break;
-        case 'ArrowDown':
-            if (this.softDropInterval) return;
-            this.softDrop();
-            this.softDropInterval = setInterval(() => this.softDrop(), this.arrInterval);
-            break;
-        case 'ArrowUp':
-            this.rotate();
-            break;
-        case ' ': // Spacebar
-            this.hardDrop();
-            break;
-        case 'c':
-        case 'C':
-            this.hold();
-            break;
-        case '1':
-            this.activatePowerUp('laser');
-            break;
-        case '2':
-            this.activatePowerUp('slow');
-            break;
-        case '3':
-            this.activatePowerUp('mutate');
-            break;
-        case '4':
-            this.activatePowerUp('aimer');
-            break;
-    }
-  }
-
-  /**
-   * Handles the release of a key, clearing any related movement timers (DAS/ARR).
-   * @param key The string identifier of the key that was released.
-   */
-  releaseKey(key: string): void {
-    switch (key) {
-        case 'ArrowLeft':
-        case 'ArrowRight':
-            clearTimeout(this.dasTimer);
-            clearInterval(this.arrTimer);
-            this.dasTimer = null;
-            this.arrTimer = null;
-            break;
-        case 'ArrowDown':
-            clearInterval(this.softDropInterval);
-            this.softDropInterval = null;
-            break;
-    }
+    this.state.gameState.set('playing');
   }
 }
---- END OF FILE: src/services/game.service.ts ---
+
+--- END OF FILE: src/services/power-up.service.ts ---
 
 --- START OF FILE: src/utils/board.utils.ts ---
 /**
@@ -1899,6 +2169,17 @@ export const ROWS = 20;
 
 /** The number of lines that must be cleared to advance to the next level. */
 export const LEVEL_THRESHOLD = 10;
+
+// --- Timings ---
+
+// Animation timings
+export const LINE_CLEAR_ANIMATION_DURATION = 300; // ms
+export const SLOW_POWERUP_DURATION = 5000; // ms
+
+// Input timings
+export const DAS_DELAY = 160; // ms
+export const ARR_INTERVAL = 40; // ms
+
 
 /**
  * A mapping of piece color indices to their corresponding Tailwind CSS background color classes.
