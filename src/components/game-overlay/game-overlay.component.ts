@@ -24,6 +24,12 @@ export class GameOverlayComponent {
   /** The current animation mode, displayed in the pause menu. */
   animationMode = input<'step' | 'smooth'>('smooth');
 
+  /** The current volume for music. */
+  musicVolume = input<number>(0.2);
+
+  /** The current volume for sound effects. */
+  sfxVolume = input<number>(0.5);
+
   /** Emits when the "Start Game" button is clicked. */
   start = output<void>();
   
@@ -35,4 +41,10 @@ export class GameOverlayComponent {
 
   /** Emits when the animation mode toggle button is clicked. */
   toggleAnimation = output<void>();
+
+  /** Emits when the music volume slider is changed. */
+  musicVolumeChange = output<Event>();
+
+  /** Emits when the sound effects volume slider is changed. */
+  sfxVolumeChange = output<Event>();
 }

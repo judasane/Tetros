@@ -185,4 +185,22 @@ export class AppComponent implements OnInit {
       return;
     }
   }
+
+  /**
+   * Handles the music volume change event from the overlay.
+   * @param event The input event from the range slider.
+   */
+  handleMusicVolumeChange(event: Event): void {
+    const volume = (event.target as HTMLInputElement).value;
+    this.game.setMusicVolume(Number(volume));
+  }
+
+  /**
+   * Handles the sound effects volume change event from the overlay.
+   * @param event The input event from the range slider.
+   */
+  handleSfxVolumeChange(event: Event): void {
+    const volume = (event.target as HTMLInputElement).value;
+    this.game.setSfxVolume(Number(volume));
+  }
 }

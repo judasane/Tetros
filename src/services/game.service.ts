@@ -42,6 +42,12 @@ export class GameService {
   isHoldingAllowed = signal(true);
   /** The value for the pre-game countdown timer. */
   countdownValue = signal(0);
+
+  // --- Audio Signals ---
+  /** The volume for music (0-1). */
+  musicVolume = signal(0.2);
+  /** The volume for sound effects (0-1). */
+  sfxVolume = signal(0.5);
   
   // --- Animation Signals ---
   /** The selected animation style for piece movement. */
@@ -77,7 +83,29 @@ export class GameService {
   private readonly arrInterval = 40;  // ms
   private softDropInterval: any = null;
 
-  constructor(private audioService: AudioService) {}
+  constructor(private audioService: AudioService) {
+    this.audioService.init();
+    this.audioService.setMusicVolume(this.musicVolume());
+    this.audioService.setSfxVolume(this.sfxVolume());
+  }
+
+  /**
+   * Sets the music volume.
+   * @param volume The new volume level (0-1).
+   */
+  setMusicVolume(volume: number): void {
+    this.musicVolume.set(volume);
+    this.audioService.setMusicVolume(volume);
+  }
+
+  /**
+   * Sets the sound effects volume.
+   * @param volume The new volume level (0-1).
+   */
+  setSfxVolume(volume: number): void {
+    this.sfxVolume.set(volume);
+    this.audioService.setSfxVolume(volume);
+  }
 
   /**
    * A computed signal that calculates the position of the ghost piece.
@@ -135,8 +163,10 @@ export class GameService {
     this.slowMotionActive = false;
 
     this.gameState.set('countdown');
-    this.countdownValue.set(3);
+    this.audioService.stopMusic(); // Stop any previous music
     this.audioService.playStartGame();
+    this.audioService.startMusic();
+    this.countdownValue.set(3);
 
     this.countdownIntervalId = setInterval(() => {
       this.countdownValue.update(v => v - 1);
@@ -414,6 +444,7 @@ export class GameService {
 
     if (!isValidPosition(this.currentPiece()!, this.board())) {
         this.gameState.set('gameover');
+        this.audioService.stopMusic();
         this.audioService.playGameOver();
     }
   }
