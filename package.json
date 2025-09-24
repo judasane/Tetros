@@ -41,5 +41,8 @@
     "vitest": "^3.1.1",
     "jsdom": "^24.1.1",
     "@analogjs/vite-plugin-angular": "^1.9.0"
+  },
+  "overrides": {
+    "chokidar": "3.6.0"
   }
 }
