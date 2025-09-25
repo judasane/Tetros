@@ -7,6 +7,7 @@ import { BoardComponent } from './components/board/board.component';
 import { GameOverlayComponent } from './components/game-overlay/game-overlay.component';
 import { InfoPanelComponent } from './components/info-panel/info-panel.component';
 import { PiecePreviewComponent } from './components/piece-preview/piece-preview.component';
+import { InstructionsComponent } from './components/instructions/instructions.component';
 import { COLS, ROWS } from './utils/constants';
 
 /**
@@ -24,12 +25,16 @@ import { COLS, ROWS } from './utils/constants';
     GameOverlayComponent,
     InfoPanelComponent,
     PiecePreviewComponent,
+    InstructionsComponent,
   ],
   providers: [],
   host: {
     '(window:keydown)': 'handleKeyDown($event)',
     '(window:keyup)': 'handleKeyUp($event)',
-    '(window:resize)': 'updateCellSize()'
+    '(window:resize)': 'updateCellSize()',
+    '(touchstart)': 'handleTouchStart($event)',
+    '(touchmove)': 'handleTouchMove($event)',
+    '(touchend)': 'handleTouchEnd($event)',
   }
 })
 export class AppComponent implements OnInit {
@@ -45,12 +50,20 @@ export class AppComponent implements OnInit {
   /** A computed signal for the total width of the game board in pixels. */
   boardWidth = computed(() => COLS * this.cellSize());
 
+  /** A configuration array for mobile control buttons. */
+  mobileControls = [
+    { label: 'Hold', action: () => this.game.hold(), disabled: () => !this.game.isHoldingAllowed(), ariaLabel: 'Hold current piece' },
+    { label: 'Pause', action: () => this.game.togglePause(), disabled: () => false, ariaLabel: 'Pause or resume the game' },
+    { label: 'Rotate', action: () => this.game.rotate(), disabled: () => false, ariaLabel: 'Rotate current piece' }
+  ];
+
   // --- Touch Gesture State ---
   private touchStartX = 0;
   private touchStartY = 0;
   private touchStartTime = 0;
   private lastMoveX = 0;
   private lastMoveY = 0;
+  private gestureLock: 'horizontal' | 'vertical' | null = null;
   private readonly swipeThreshold = 30; // Min pixels for a swipe
   private readonly tapThreshold = 20;   // Max pixels for a tap
   private readonly tapTimeThreshold = 200; // Max ms for a tap
@@ -122,6 +135,11 @@ export class AppComponent implements OnInit {
    * @param event The TouchEvent.
    */
   handleTouchStart(event: TouchEvent): void {
+    const targetElement = event.target as HTMLElement;
+    if (targetElement.closest('button')) {
+      return; // Ignore gestures starting on a button
+    }
+
     if (this.game.gameState() !== 'playing') return;
     event.preventDefault();
     this.touchStartX = event.touches[0].clientX;
@@ -129,6 +147,7 @@ export class AppComponent implements OnInit {
     this.touchStartTime = Date.now();
     this.lastMoveX = this.touchStartX;
     this.lastMoveY = this.touchStartY;
+    this.gestureLock = null; // Reset gesture lock
   }
 
   /**
@@ -138,20 +157,30 @@ export class AppComponent implements OnInit {
   handleTouchMove(event: TouchEvent): void {
     if (this.game.gameState() !== 'playing') return;
     event.preventDefault();
+
     const touchX = event.touches[0].clientX;
     const touchY = event.touches[0].clientY;
-
     const deltaX = touchX - this.lastMoveX;
     const deltaY = touchY - this.lastMoveY;
     
     const horizontalMoveThreshold = this.cellSize() * 0.8;
     const verticalMoveThreshold = this.cellSize() * 0.8;
 
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > horizontalMoveThreshold) {
+    // Determine gesture direction and lock it if not already locked
+    if (!this.gestureLock) {
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > horizontalMoveThreshold) {
+        this.gestureLock = 'horizontal';
+      } else if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > verticalMoveThreshold) {
+        this.gestureLock = 'vertical';
+      }
+    }
+
+    // Execute action based on the locked gesture
+    if (this.gestureLock === 'horizontal' && Math.abs(deltaX) > horizontalMoveThreshold) {
       if (deltaX > 0) this.game.moveRight();
       else this.game.moveLeft();
       this.lastMoveX = touchX;
-    } else if (Math.abs(deltaY) > Math.abs(deltaX) && deltaY > verticalMoveThreshold) {
+    } else if (this.gestureLock === 'vertical' && deltaY > verticalMoveThreshold) {
       this.game.softDrop();
       this.lastMoveY = touchY;
     }
