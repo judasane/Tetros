@@ -24,7 +24,7 @@ export class BoardComponent {
   readonly COLS = COLS;
   
   /** The 2D array representing the static, locked-in pieces on the board. */
-  boardInput = input.required<number[][]>({ alias: 'board' });
+  board = input.required<number[][]>();
   
   /** The currently falling piece, or null if none. */
   currentPiece = input.required<Piece | null>();
@@ -42,5 +42,5 @@ export class BoardComponent {
   cellSize = input<number>(32);
 
   /** A computed signal that directly passes the board input to the template. */
-  boardToRender = computed(() => this.boardInput());
+  boardToRender = computed(() => this.board());
 }
