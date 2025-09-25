@@ -58,6 +58,7 @@ export class AppComponent implements OnInit {
   ];
 
   // --- Touch Gesture State ---
+  private touchStartedOnButton = false;
   private touchStartX = 0;
   private touchStartY = 0;
   private touchStartTime = 0;
@@ -137,11 +138,12 @@ export class AppComponent implements OnInit {
   handleTouchStart(event: TouchEvent): void {
     const targetElement = event.target as HTMLElement;
     if (targetElement.closest('button')) {
-      return; // Ignore gestures starting on a button
+      this.touchStartedOnButton = true;
+      return;
     }
+    this.touchStartedOnButton = false;
 
     if (this.game.gameState() !== 'playing') return;
-    event.preventDefault();
     this.touchStartX = event.touches[0].clientX;
     this.touchStartY = event.touches[0].clientY;
     this.touchStartTime = Date.now();
@@ -155,8 +157,12 @@ export class AppComponent implements OnInit {
    * @param event The TouchEvent.
    */
   handleTouchMove(event: TouchEvent): void {
+    if (this.touchStartedOnButton) return;
+    const targetElement = event.target as HTMLElement;
+    if (targetElement.closest('button')) {
+      return;
+    }
     if (this.game.gameState() !== 'playing') return;
-    event.preventDefault();
 
     const touchX = event.touches[0].clientX;
     const touchY = event.touches[0].clientY;
@@ -177,10 +183,12 @@ export class AppComponent implements OnInit {
 
     // Execute action based on the locked gesture
     if (this.gestureLock === 'horizontal' && Math.abs(deltaX) > horizontalMoveThreshold) {
+      event.preventDefault();
       if (deltaX > 0) this.game.moveRight();
       else this.game.moveLeft();
       this.lastMoveX = touchX;
     } else if (this.gestureLock === 'vertical' && deltaY > verticalMoveThreshold) {
+      event.preventDefault();
       this.game.softDrop();
       this.lastMoveY = touchY;
     }
@@ -191,8 +199,16 @@ export class AppComponent implements OnInit {
    * @param event The TouchEvent.
    */
   handleTouchEnd(event: TouchEvent): void {
+    if (this.touchStartedOnButton) {
+      this.touchStartedOnButton = false; // Reset the flag
+      return;
+    }
+    const targetElement = event.target as HTMLElement;
+    if (targetElement.closest('button')) {
+      return;
+    }
     if (this.game.gameState() !== 'playing') return;
-    event.preventDefault();
+
     const touchEndX = event.changedTouches[0].clientX;
     const touchEndY = event.changedTouches[0].clientY;
 
@@ -202,12 +218,14 @@ export class AppComponent implements OnInit {
 
     // Check for Tap (Rotate)
     if (Math.abs(deltaX) < this.tapThreshold && Math.abs(deltaY) < this.tapThreshold && elapsedTime < this.tapTimeThreshold) {
+      event.preventDefault();
       this.game.rotate();
       return;
     }
 
     // Check for Hard Drop (fast, long downward swipe)
     if (deltaY > this.swipeThreshold * 2.5 && deltaY > Math.abs(deltaX) && elapsedTime < this.hardDropTimeThreshold) {
+      event.preventDefault();
       this.game.hardDrop();
       return;
     }
