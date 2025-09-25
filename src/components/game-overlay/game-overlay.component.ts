@@ -25,7 +25,7 @@ export class GameOverlayComponent {
   animationMode = input<'step' | 'smooth'>('smooth');
 
   /** Emits when the "Start Game" button is clicked. */
-  startEvent = output<void>();
+  startEvent = output<void>({ alias: 'start' });
   
   /** Emits when a "Restart" or "Play Again" button is clicked. */
   restart = output<void>();
