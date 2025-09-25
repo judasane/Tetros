@@ -100,15 +100,14 @@
         <div class="w-full">
             <app-info-panel>
                 <div class="grid grid-cols-3 gap-2 text-center">
-                    <button (click)="game.hold()" [disabled]="!game.isHoldingAllowed()" class="p-2 border-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed h-12 flex justify-center items-center border-slate-600 text-slate-300">
-                        Hold
+                  @for (control of mobileControls; track control.label) {
+                    <button
+                      (click)="control.action()"
+                      [disabled]="control.disabled()"
+                      class="p-2 border-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed h-12 flex justify-center items-center border-slate-600 text-slate-300">
+                      {{ control.label }}
                     </button>
-                    <button (click)="game.togglePause()" class="p-2 border-2 rounded-md h-12 flex justify-center items-center border-slate-600 text-slate-300">
-                        Pause
-                    </button>
-                    <button (click)="game.rotate()" class="p-2 border-2 rounded-md h-12 flex justify-center items-center border-slate-600 text-slate-300">
-                        Rotate
-                    </button>
+                  }
                 </div>
             </app-info-panel>
         </div>

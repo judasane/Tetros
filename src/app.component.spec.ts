@@ -76,8 +76,6 @@ describe('AppComponent', () => {
       // Set a fixed cell size for predictable thresholds
       component.cellSize.set(20);
       vi.useFakeTimers();
-      // Reset mocks before each test
-      vi.clearAllMocks();
       // Set game state to playing for handlers to execute
       facade.gameState.set('playing');
     });
@@ -145,6 +143,48 @@ describe('AppComponent', () => {
 
         expect(facade.moveRight).not.toHaveBeenCalled();
         expect(facade.rotate).not.toHaveBeenCalled();
+    });
+
+    it('should lock to horizontal movement and ignore vertical', () => {
+        component.handleTouchStart(createTouchEvent('touchstart', 100, 100));
+        // Initial horizontal move to lock the gesture
+        component.handleTouchMove(createTouchEvent('touchmove', 120, 101));
+        // Subsequent vertical move that should be ignored
+        component.handleTouchMove(createTouchEvent('touchmove', 120, 120));
+
+        expect(facade.moveRight).toHaveBeenCalledTimes(1);
+        expect(facade.softDrop).not.toHaveBeenCalled();
+    });
+
+    it('should lock to vertical movement and ignore horizontal', () => {
+        component.handleTouchStart(createTouchEvent('touchstart', 100, 100));
+        // Initial vertical move to lock the gesture
+        component.handleTouchMove(createTouchEvent('touchmove', 101, 120));
+        // Subsequent horizontal move that should be ignored
+        component.handleTouchMove(createTouchEvent('touchmove', 125, 120));
+
+        expect(facade.softDrop).toHaveBeenCalledTimes(1);
+        expect(facade.moveRight).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Mobile Controls', () => {
+    it('should call game.hold() when hold button is clicked', () => {
+        const holdControl = component.mobileControls.find(c => c.label === 'Hold');
+        holdControl?.action();
+        expect(facade.hold).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call game.togglePause() when pause button is clicked', () => {
+        const pauseControl = component.mobileControls.find(c => c.label === 'Pause');
+        pauseControl?.action();
+        expect(facade.togglePause).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call game.rotate() when rotate button is clicked', () => {
+        const rotateControl = component.mobileControls.find(c => c.label === 'Rotate');
+        rotateControl?.action();
+        expect(facade.rotate).toHaveBeenCalledTimes(1);
     });
   });
 });
