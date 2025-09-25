@@ -39,17 +39,20 @@ class MockGameFacade {
 }
 
 // Helper to create a TouchEvent in JSDOM where `Touch` is not defined
-const createTouchEvent = (type: 'touchstart' | 'touchmove' | 'touchend', x: number, y: number): TouchEvent => {
-    const touchPoint = { clientX: x, clientY: y };
-    // We need to use a real TouchEvent for the instance check in the component to work
-    const event = new TouchEvent(type, {
-        bubbles: true,
-        cancelable: true,
-    });
-    // JSDOM doesn't fully implement TouchEvent properties
-    Object.defineProperty(event, 'touches', { value: [touchPoint], configurable: true });
-    Object.defineProperty(event, 'changedTouches', { value: [touchPoint], configurable: true });
-    return event;
+const createTouchEvent = (type: string, x: number, y: number): TouchEvent => {
+  const touchPoint = { clientX: x, clientY: y };
+  const event = new TouchEvent(type, {
+    bubbles: true,
+    cancelable: true,
+  });
+
+  Object.defineProperty(event, 'touches', { value: [touchPoint], configurable: true });
+  Object.defineProperty(event, 'changedTouches', { value: [touchPoint], configurable: true });
+
+  // Add a generic target to prevent 'closest' of null error in tests
+  Object.defineProperty(event, 'target', { value: document.createElement('div'), configurable: true });
+
+  return event;
 };
 
 
