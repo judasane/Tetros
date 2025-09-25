@@ -37,6 +37,7 @@ export class GameFacade {
   readonly dropProgress = this.state.dropProgress.asReadonly();
   readonly animationMode = this.state.animationMode.asReadonly();
   readonly ghostPiece = this.animation.ghostPiece;
+  readonly isHoldingAllowed = this.state.isHoldingAllowed.asReadonly();
 
   // --- Action Methods (for touch controls) ---
   readonly moveLeft = this.actions.moveLeft.bind(this.actions);
