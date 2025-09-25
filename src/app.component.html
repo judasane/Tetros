@@ -104,6 +104,7 @@
                     <button
                       (click)="control.action()"
                       [disabled]="control.disabled()"
+                      [attr.aria-label]="control.ariaLabel"
                       class="p-2 border-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed h-12 flex justify-center items-center border-slate-600 text-slate-300">
                       {{ control.label }}
                     </button>

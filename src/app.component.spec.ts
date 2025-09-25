@@ -21,6 +21,7 @@ class MockGameFacade {
   toggleAnimationMode = vi.fn();
   activatePowerUp = vi.fn();
   canUsePowerUp = vi.fn(() => true);
+  hold = vi.fn();
 
   // Signals needed by the template
   board = signal(createEmptyBoard());

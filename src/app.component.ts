@@ -52,9 +52,9 @@ export class AppComponent implements OnInit {
 
   /** A configuration array for mobile control buttons. */
   mobileControls = [
-    { label: 'Hold', action: () => this.game.hold(), disabled: () => !this.game.isHoldingAllowed() },
-    { label: 'Pause', action: () => this.game.togglePause(), disabled: () => false },
-    { label: 'Rotate', action: () => this.game.rotate(), disabled: () => false }
+    { label: 'Hold', action: () => this.game.hold(), disabled: () => !this.game.isHoldingAllowed(), ariaLabel: 'Hold current piece' },
+    { label: 'Pause', action: () => this.game.togglePause(), disabled: () => false, ariaLabel: 'Pause or resume the game' },
+    { label: 'Rotate', action: () => this.game.rotate(), disabled: () => false, ariaLabel: 'Rotate current piece' }
   ];
 
   // --- Touch Gesture State ---
@@ -135,6 +135,11 @@ export class AppComponent implements OnInit {
    * @param event The TouchEvent.
    */
   handleTouchStart(event: TouchEvent): void {
+    const targetElement = event.target as HTMLElement;
+    if (targetElement.closest('button')) {
+      return; // Ignore gestures starting on a button
+    }
+
     if (this.game.gameState() !== 'playing') return;
     event.preventDefault();
     this.touchStartX = event.touches[0].clientX;
