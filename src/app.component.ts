@@ -7,6 +7,7 @@ import { BoardComponent } from './components/board/board.component';
 import { GameOverlayComponent } from './components/game-overlay/game-overlay.component';
 import { InfoPanelComponent } from './components/info-panel/info-panel.component';
 import { PiecePreviewComponent } from './components/piece-preview/piece-preview.component';
+import { InstructionsComponent } from './components/instructions/instructions.component';
 import { COLS, ROWS } from './utils/constants';
 
 /**
@@ -24,12 +25,16 @@ import { COLS, ROWS } from './utils/constants';
     GameOverlayComponent,
     InfoPanelComponent,
     PiecePreviewComponent,
+    InstructionsComponent,
   ],
   providers: [],
   host: {
     '(window:keydown)': 'handleKeyDown($event)',
     '(window:keyup)': 'handleKeyUp($event)',
-    '(window:resize)': 'updateCellSize()'
+    '(window:resize)': 'updateCellSize()',
+    '(touchstart)': 'handleTouchStart($event)',
+    '(touchmove)': 'handleTouchMove($event)',
+    '(touchend)': 'handleTouchEnd($event)',
   }
 })
 export class AppComponent implements OnInit {
