@@ -1,15 +1,141 @@
---- FLATTENED REPOSITORY SOURCE ---
-Generated at: Wed Sep 24 16:22:08 UTC 2025
-Branch: main
-Commit: 35968ccc5ffa315d0f4a96f00475347186a971d1
-------------------------------------
+==================================
+FLATTENED: Tetros
+Type: Game Project
+Generated at: Wed Oct 22 04:18:15 UTC 2025
+Branch: development
+Commit: 631a2873052fcf65dc53f48ea01d426472abfc6b
+Repository: judasane/Tetros
+==================================
+
+--- START OF FILE: .eslintrc.json ---
+{
+  "root": true,
+  "ignorePatterns": [
+    "projects/**/*"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "*.ts"
+      ],
+      "parserOptions": {
+        "project": [
+          "tsconfig.json"
+        ],
+        "createDefaultProgram": true
+      },
+      "extends": [
+        "plugin:@angular-eslint/recommended",
+        "plugin:@angular-eslint/template/process-inline-templates"
+      ],
+      "rules": {
+        "@angular-eslint/directive-selector": [
+          "error",
+          {
+            "type": "attribute",
+            "prefix": "app",
+            "style": "camelCase"
+          }
+        ],
+        "@angular-eslint/component-selector": [
+          "error",
+          {
+            "type": "element",
+            "prefix": "app",
+            "style": "kebab-case"
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "*.html"
+      ],
+      "extends": [
+        "plugin:@angular-eslint/template/recommended"
+      ],
+      "rules": {}
+    }
+  ]
+}
+--- END OF FILE: .eslintrc.json ---
+
+--- START OF FILE: .github/workflows/ci.yml ---
+name: CI
+
+on:
+  push:
+    branches:
+      - development
+  pull_request:
+    branches:
+      - development
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '22.x'
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '22.x'
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      - name: Install dependencies
+        run: npm ci
+      - name: Test
+        run: npm run test
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '22.x'
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+--- END OF FILE: .github/workflows/ci.yml ---
 
 --- START OF FILE: .github/workflows/deploy.yml ---
 name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main
+      - development
 permissions:
   contents: read
   pages: write
@@ -51,71 +177,145 @@ jobs:
 --- END OF FILE: .github/workflows/deploy.yml ---
 
 --- START OF FILE: .github/workflows/flatten.yml ---
-name: Create Flattened File
+name: 🎮 Flatten Repository
 
 on:
+  push:
+    branches:
+      - development
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   flatten-and-commit:
+    name: Generate Flattened Repository File
     runs-on: ubuntu-latest
+    # Prevent infinite loop: skip if last commit was from github-actions bot
+    if: github.event.head_commit.author.name != 'github-actions[bot]'
     permissions:
       contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate flattened file
         run: |
-          OUTPUT_FILE="flattened_output.txt"
-          # Add or remove file extensions to exclude
-          EXCLUDE_EXTENSIONS="map,tsbuildinfo,log,lock,db,sqlite,sqlite3,dump,lcov,png,jpg,jpeg,gif,ico,zip,gz,pdf,mp4,svg"
-          # Add or remove specific filenames to exclude
-          EXCLUDE_FILES="package-lock.json,yarn.lock,pnpm-lock.yaml"
+          echo "🔍 Starting flatten process..."
 
-          echo "--- FLATTENED REPOSITORY SOURCE ---" > "$OUTPUT_FILE"
+          echo "📋 Files currently tracked by git:"
+          git ls-files 'flattened*.txt' 'repository_flattened.txt' 'flattened_output.txt' 2>/dev/null || echo "No flattened files in git"
+
+          # Generate filename with repo name and timestamp
+          REPO_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2)
+          TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+          OUTPUT_FILE="flattened_${REPO_NAME}_${TIMESTAMP}.txt"
+
+          echo "📝 Output file will be: $OUTPUT_FILE"
+
+          EXCLUDE_EXTENSIONS="map,tsbuildinfo,log,lock,db,sqlite,sqlite3,dump,lcov,png,jpg,jpeg,gif,ico,zip,gz,pdf,mp4,svg,webp"
+          EXCLUDE_FILES="package-lock.json,yarn.lock,pnpm-lock.yaml"
+          EXCLUDE_DIRS="node_modules,bower_components,dist,build,out,.next,.nuxt,.svelte-kit,coverage,.idea,.vscode,.fleet,.venv,venv,.angular"
+
+          echo "==================================" > "$OUTPUT_FILE"
+          echo "FLATTENED: $REPO_NAME" >> "$OUTPUT_FILE"
+          echo "Type: Game Project" >> "$OUTPUT_FILE"
           echo "Generated at: $(date)" >> "$OUTPUT_FILE"
           echo "Branch: ${GITHUB_REF##*/}" >> "$OUTPUT_FILE"
           echo "Commit: ${GITHUB_SHA}" >> "$OUTPUT_FILE"
-          echo "------------------------------------" >> "$OUTPUT_FILE"
+          echo "Repository: $GITHUB_REPOSITORY" >> "$OUTPUT_FILE"
+          echo "==================================" >> "$OUTPUT_FILE"
           echo "" >> "$OUTPUT_FILE"
 
           exclude_ext_pattern=$(echo "$EXCLUDE_EXTENSIONS" | sed 's/,/|/g')
-          # Also exclude the output file itself
-          exclude_files_pattern="$OUTPUT_FILE|$(echo "$EXCLUDE_FILES" | sed 's/,/|/g')"
+          exclude_files_pattern="$(echo "$EXCLUDE_FILES" | sed 's/,/|/g')"
+          exclude_dirs_pattern=$(echo "$EXCLUDE_DIRS" | sed 's/,/|/g')
+
+          echo "🔎 Scanning repository files..."
+          FILE_COUNT=0
 
           git ls-files | \
+          grep -vE "^($exclude_dirs_pattern)/" | \
           grep -vE "\.($exclude_ext_pattern)$" | \
           grep -vE "^($exclude_files_pattern)$" | \
+          grep -vE "^flattened.*\.txt$" | \
+          grep -vE "^repository_flattened\.txt$" | \
           while IFS= read -r file; do
-              echo "--- START OF FILE: $file ---" >> "$OUTPUT_FILE"
-              cat "$file" >> "$OUTPUT_FILE"
-              echo -e "\n--- END OF FILE: $file ---\n" >> "$OUTPUT_FILE"
+              if [ -f "$file" ]; then
+                echo "--- START OF FILE: $file ---" >> "$OUTPUT_FILE"
+                cat "$file" >> "$OUTPUT_FILE"
+                echo -e "\n--- END OF FILE: $file ---\n" >> "$OUTPUT_FILE"
+                FILE_COUNT=$((FILE_COUNT + 1))
+              fi
           done
 
           echo "✅ Repository flattened into $OUTPUT_FILE"
 
+          # Verify file was created
+          if [ -f "$OUTPUT_FILE" ]; then
+            FILE_SIZE=$(wc -c < "$OUTPUT_FILE")
+            echo "📊 File created successfully: $FILE_SIZE bytes"
+            echo "📄 First few lines:"
+            head -n 10 "$OUTPUT_FILE"
+          else
+            echo "❌ ERROR: Output file was not created!"
+            exit 1
+          fi
+
+          # Save variables for later steps
+          echo "OUTPUT_FILE=$OUTPUT_FILE" >> $GITHUB_ENV
+
       - name: Commit and push flattened file
         run: |
+          echo "🔧 Configuring git..."
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add $OUTPUT_FILE
-          # Check if there are changes to commit to avoid empty commits
+
+          echo "📋 Files in working directory BEFORE cleanup:"
+          ls -lh flattened*.txt repository_flattened.txt flattened_output.txt 2>/dev/null || echo "No flattened files found"
+
+          echo "🗑️ Removing ALL old flattened files except the new one..."
+          # Use git ls-files to find all tracked flattened files
+          git ls-files 'flattened*.txt' 'repository_flattened.txt' 'flattened_output.txt' 2>/dev/null | while read -r old_file; do
+            if [ "$old_file" != "$OUTPUT_FILE" ]; then
+              echo "  Removing from git: $old_file"
+              git rm -f "$old_file"
+            fi
+          done
+
+          echo "📋 Files in working directory AFTER cleanup:"
+          ls -lh flattened*.txt 2>/dev/null || echo "Only new file should remain"
+
+          echo "➕ Adding new flattened file: $OUTPUT_FILE"
+          git add -f "$OUTPUT_FILE"
+
+          echo "📊 Git diff summary:"
+          git diff --staged --stat
+
+          echo "📊 Detailed changes:"
+          git status --short
+
           if git diff --staged --quiet; then
-            echo "No changes to commit. The flattened file is already up-to-date."
+            echo "⚠️  No changes to commit."
           else
-            git commit -m "docs: Add/update flattened repository file" -m "This commit was generated by a GitHub Action."
+            echo "💾 Committing changes..."
+            git commit -m "docs: Update flattened repository file [skip ci]" -m "Generated at: $(date)" -m "Auto-generated by GitHub Actions."
+
+            echo "🚀 Pushing to remote..."
             git push
+            echo "✅ Changes pushed successfully!"
           fi
-        env:
-          OUTPUT_FILE: "flattened_output.txt"
 
       - name: Upload artifact for easy download
         uses: actions/upload-artifact@v4
         with:
           name: flattened-repository-file
-          path: flattened_output.txt
+          path: flattened_*.txt
           if-no-files-found: error
 
 --- END OF FILE: .github/workflows/flatten.yml ---
@@ -181,8 +381,323 @@ dist-ssr
 
 --- END OF FILE: .idx/dev.nix ---
 
+--- START OF FILE: AGENTS.md ---
+# 🧭 AGENTS.md — Tetros
+
+> **For project overview and gameplay mechanics, see [README.md](./README.md)**
+> This document contains **operational guidelines for AI agents** working on the Tetros codebase.
+
+## 📘 Table of Contents
+
+1. [Security Requirements](#1-security-requirements) 🔒
+2. [Agent Permissions](#2-agent-permissions) ⚖️
+3. [Development Commands](#3-development-commands) ⚡
+4. [Code Standards](#4-code-standards) 📋
+5. [Quality Assurance Pipeline](#5-quality-assurance-pipeline) 🛡️
+6. [Testing](#6-testing) 🧪
+7. [Operational Checklist](#7-operational-checklist) ✅
+8. [When Stuck](#8-when-stuck) 🤔
+
+---
+
+## 1. Security Requirements
+
+**🚨 NON-NEGOTIABLE: These security rules must ALWAYS be followed.**
+
+### 🔐 Critical Rules
+
+```bash
+# ❌ NEVER commit these files
+.env
+.env.*
+*.key
+*.pem
+config/secrets.json
+
+# ❌ NEVER hardcode secrets or credentials
+const apiKey = "sk-1234567890"
+
+# ✅ ALWAYS use environment variables
+const apiKey = process.env.VITE_API_KEY
+```
+
+| Type        | Example         | Storage              |
+| ----------- | --------------- | -------------------- |
+| **Public**  | `VITE_APP_NAME` | In code              |
+| **Private** | `DATABASE_URL`  | .env only            |
+| **Secret**  | `JWT_SECRET`    | Vault or CI env only |
+
+---
+
+## 2. Agent Permissions
+
+**⚖️ Operational boundaries for AI automation.**
+
+### ✅ Allowed (Level 2 — Sandbox)
+
+| Action                 | Example Commands                   | Notes           |
+| ---------------------- | ---------------------------------- | --------------- |
+| **Read/analyze files** | `cat`, `ls`, `grep`                | Full access     |
+| **Lint & format**      | `npm run lint`, `prettier --write` | Reversible      |
+| **Type check**         | `tsc --noEmit`                     | Safe            |
+| **Run tests**          | `npm test`, `vitest run`           | Non-destructive |
+| **Build preview**      | `npm run build`                    | Validation only |
+
+### 🟡 Requires User Approval (Level 3 — Privileged)
+
+| Action                      | Command                       | Reason                   |
+| --------------------------- | ----------------------------- | ------------------------ |
+| **Install packages**        | `npm install <pkg>`           | Alters dependencies      |
+| **Git operations**          | `git push`, `merge`, `rebase` | Affects repo state       |
+| **Delete files**            | `rm`, `rmdir`                 | Irreversible             |
+| **Edit environment/config** | `.env`, `vite.config.ts`      | Security impact          |
+
+**Before L3 actions, agent must:**
+
+1. Display the command and parameters
+2. Simulate plan of execution
+3. Wait for explicit approval
+
+---
+
+## 3. Development Commands
+
+**⚡ Prefer fast, file-scoped commands for low-cost feedback.**
+
+### Global Commands
+
+| Task         | Command           |
+| ------------ | ----------------- |
+| Install deps | `npm install`     |
+| Serve dev    | `npm run dev`     |
+| Build        | `npm run build`   |
+| Preview      | `npm run preview` |
+| Test all     | `npm test`        |
+| Lint all     | `npm run lint`    |
+| Coverage     | `npm run test:coverage` |
+
+### File-Scoped Examples
+
+```bash
+npx eslint src/app/components/falling-piece/falling-piece.component.ts --fix
+npx prettier --write src/services/game-loop.service.ts
+npx tsc --noEmit src/utils/piece.utils.ts
+npm test -- src/services/game-loop.service.spec.ts
+```
+
+### Angular CLI Shortcuts
+
+```bash
+ng generate component components/my-component
+ng generate service services/my-service
+```
+
+---
+
+## 4. Code Standards
+
+### Naming & Structure
+
+| Type             | Format     | Example                      |
+| ---------------- | ---------- | ---------------------------- |
+| Component        | PascalCase | `FallingPieceComponent`      |
+| Service          | PascalCase | `GameLoopService`            |
+| Interface / Type | PascalCase | `GameState`                  |
+| File             | kebab-case | `falling-piece.component.ts` |
+| Selector         | kebab-case | `<app-falling-piece>`        |
+
+### Principles
+
+- Avoid `any`, `var`, `console.log` (use proper logging if needed).
+- Use `Readonly`, `private`, and `const`.
+- Split logic: services for game logic, components for view.
+- No direct DOM access → use `Renderer2`.
+- Prefer `ChangeDetectionStrategy.OnPush`.
+
+### Angular 20+ Modern Patterns
+
+**🎯 This project uses Angular 20 with modern patterns:**
+
+#### Signals for State Management
+```typescript
+// ✅ CORRECT: Use signals for reactive state
+import { signal, computed } from '@angular/core';
+
+export class GameFacadeService {
+  private score = signal<number>(0);
+  private level = signal<number>(1);
+
+  // Computed signals for derived state
+  displayScore = computed(() => this.score().toString().padStart(6, '0'));
+}
+```
+
+#### Zoneless Change Detection
+```typescript
+// ✅ This project uses zoneless mode
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideZonelessChangeDetection(),
+    // ...
+  ]
+};
+```
+
+#### Standalone Components
+```typescript
+// ✅ CORRECT: All components must be standalone
+@Component({
+  selector: 'app-game-board',
+  standalone: true,
+  imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './game-board.component.html',
+})
+export class GameBoardComponent {}
+```
+
+### Git Commits
+
+**Use [Conventional Commits](https://www.conventionalcommits.org/)**: `type(scope): description`
+
+Common types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
+
+Breaking changes: add `!` → `feat(game)!: change scoring system`
+
+---
+
+## 5. Quality Assurance Pipeline
+
+🛡️ Every commit MUST pass the pipeline below:
+
+### Step 1. Lint & Style
+
+```bash
+npm run lint -- --fix
+```
+
+### Step 2. Unit Tests
+
+```bash
+npm test -- --coverage
+```
+
+✅ **Minimum: 80% coverage**
+
+### Step 3. Type & Build Verification
+
+```bash
+npx tsc --noEmit
+npm run build
+```
+
+### Quality Matrix
+
+| Check      | Tool       | Target                 |
+| ---------- | ---------- | ---------------------- |
+| **Lint**   | ESLint     | 100% clean             |
+| **Format** | Prettier   | 100% consistent        |
+| **Test**   | Vitest     | ≥ 80% coverage         |
+| **Type**   | TypeScript | 0 errors               |
+| **Build**  | Vite       | Pass                   |
+
+---
+
+## 6. Testing
+
+### Unit Tests (Vitest)
+
+```bash
+npm test                    # Run all tests
+npm run test:ui             # Interactive UI
+npm run test:coverage       # Generate coverage report
+```
+
+- **Coverage Requirement**: ≥80% line/branch/function coverage
+- **Location**: Tests are colocated with source files (`*.spec.ts`)
+- **Reports**: HTML coverage reports in `./coverage/`
+
+**Run specific tests:**
+```bash
+npm test -- src/services/game-loop.service.spec.ts
+```
+
+### Test Setup Configuration
+
+**Location:** `src/test-setup.ts`
+
+Critical mocks required for JSDOM environment:
+
+```typescript
+// Mock window.matchMedia for theme detection
+Object.defineProperty(window, 'matchMedia', {
+  value: vi.fn().mockImplementation((query) => ({
+    matches: false,
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  })),
+});
+```
+
+---
+
+## 7. Operational Checklist
+
+| ✅ Checkpoint        | Requirement                                    |
+| -------------------- | ---------------------------------------------- |
+| **Typing strict**    | `noImplicitAny`, `strictNullChecks`            |
+| **Coverage**         | ≥ 80%                                          |
+| **Style**            | Prettier + ESLint clean                        |
+| **Change Detection** | `OnPush`                                       |
+| **Async**            | Use Observables + `async` pipe                 |
+| **DOM**              | Access via `Renderer2` only                    |
+| **Permissions**      | Follow L2/L3 rules before destructive actions  |
+
+---
+
+## 8. When Stuck 🤔
+
+If uncertain about a change:
+
+1. Do **not** make speculative edits.
+2. Propose a **short execution plan** summarizing what you intend to modify.
+3. Ask the user for confirmation or open a **draft PR** with notes.
+4. Document unresolved questions in a comment block before continuing.
+
+---
+
+> 🧠 **Note:**
+> AGENTS.md is the single source of truth for automated and human contributors.
+> All AI agents must respect this document's hierarchy and constraints.
+> When uncertain, pause execution, summarize the plan, and request user confirmation.
+
+--- END OF FILE: AGENTS.md ---
+
 --- START OF FILE: README.md ---
+<div align="center">
+
 # Tetros: El Tejedor Cósmico
+
+**Un juego de bloques con mecánicas innovadoras y temática cósmica**
+
+[![Angular](https://img.shields.io/badge/Angular-20.1-DD0031?logo=angular&logoColor=white)](https://angular.io/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vitest](https://img.shields.io/badge/Tested_with-Vitest-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
+![Coverage](https://img.shields.io/badge/Coverage-%E2%89%A580%25-brightgreen)
+
+[Características](#características-principales) •
+[Inicio Rápido](#inicio-rápido) •
+[Desarrollo](#desarrollo) •
+[Pruebas](#pruebas) •
+[Despliegue](#despliegue) •
+[Herramientas IA](#herramientas-ia)
+
+</div>
+
+---
+
+## Descripción
 
 > *En la vasta y silenciosa expansión donde nacen las estrellas y se desvanecen las galaxias, existe un telar de energía cósmica. Tú, alma valiente, eres el Tejedor, encargado de un deber eterno: dar forma al tejido mismo de la realidad a partir de fragmentos de luz estelar que caen.*
 
@@ -191,39 +706,405 @@ dist-ssr
 Si fallas, el caos consumirá el tablero. Si tienes éxito, traerás orden al universo, una línea resplandeciente a la vez.
 
 ---
-## El Arcano: Blandiendo Poderes Etéreos
 
-El cosmos ayuda a quienes demuestran su valía. Al alinear los filamentos, desbloquearás potentes habilidades, poderosos encantamientos para doblegar la realidad a tu voluntad:
+## Características Principales
 
-*   ⚡️ **Rayo Celestial:** Desata un penetrante rayo de energía pura para aniquilar una línea obstinada de la existencia.
-*   ⏳ **Flujo Temporal:** Doblega el flujo del tiempo mismo, haciendo que los fragmentos de estrellas desciendan con una lentitud etérea.
-*   ✨ **Transmutación Caótica:** Invoca la naturaleza impredecible del vacío, remodelando instantáneamente el fragmento que cae en una nueva forma.
-*   📦 **Convergencia Destinada:** Contempla el tejido del destino, apuntando y eliminando con precisión un único bloque mal colocado para restaurar el equilibrio.
+- **🎮 Mecánicas Clásicas Mejoradas**: Sistema de bloques basado en Tetris con físicas precisas
+- **⚡ Poderes Arcanos**: 4 habilidades únicas que alteran la realidad del juego
+  - Rayo Celestial: Elimina líneas específicas
+  - Flujo Temporal: Ralentiza la caída de piezas
+  - Transmutación Caótica: Cambia la forma de las piezas
+  - Convergencia Destinada: Elimina bloques individuales
+- **📱 Controles Táctiles**: Soporte completo para dispositivos móviles
+- **🎨 Tema Cósmico**: Interfaz dark/light con estética estelar
+- **🏆 Sistema de Puntuación**: Scoring avanzado con multiplicadores
+- **⏸️ Pausa Inteligente**: El juego se pausa automáticamente al cambiar de pestaña
+- **🎯 Arquitectura Moderna**: Angular 20 con signals, zoneless y standalone components
+- **🧪 Alta Calidad**: ≥80% de cobertura de pruebas
 
 ---
-## Las Incantaciones: Controles del Tejedor
 
-Para comandar los fragmentos celestiales, debes dominar estos antiguos ritos:
+## Stack Tecnológico
+
+| Categoría | Tecnologías |
+|----------|-------------|
+| **Framework** | Angular 20.1 (zoneless, signals) |
+| **Build Tool** | Vite 6.2 + AnalogJS |
+| **Lenguaje** | TypeScript 5.8 |
+| **Estilos** | Tailwind CSS + CSS personalizado |
+| **Gestión de Estado** | Angular Signals + RxJS 7.8 |
+| **Pruebas** | Vitest (unit, ≥80% coverage) |
+| **Linting** | ESLint + Prettier |
+
+---
+
+## Inicio Rápido
+
+### Requisitos Previos
+
+- **Node.js** v22.x o superior
+- **npm** (viene con Node.js)
+
+### Instalación
+
+1. **Clonar el repositorio**
+   ```bash
+   git clone https://github.com/judasane/Tetros.git
+   cd Tetros
+   npm install
+   ```
+
+2. **Iniciar el servidor de desarrollo**
+   ```bash
+   npm run dev
+   ```
+
+   Se abre en `http://localhost:4200` con recarga en caliente habilitada.
+
+3. **Construir para producción**
+   ```bash
+   npm run build
+   npm run preview  # Previsualizar build de producción
+   ```
+
+---
+
+## Desarrollo
+
+### Comandos Disponibles
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run dev` | Iniciar servidor de desarrollo con HMR |
+| `npm run build` | Crear build de producción |
+| `npm run preview` | Servir build de producción localmente |
+| `npm test` | Ejecutar pruebas unitarias con Vitest |
+| `npm run test:ui` | Abrir interfaz interactiva de pruebas |
+| `npm run test:coverage` | Generar reporte de cobertura (≥80% threshold) |
+| `npm run lint` | Lint y auto-arreglar código |
+| `npx tsc --noEmit` | Verificar tipos sin construir |
+
+### Estructura del Proyecto
+
+```
+Tetros/
+├── src/
+│   ├── app/
+│   │   ├── components/        # Componentes UI (board, piece, cell, etc.)
+│   │   ├── services/          # Lógica del juego (game-loop, input, animation)
+│   │   └── utils/             # Utilidades (piece.utils, board.utils, game-logic.utils)
+│   ├── app.component.ts       # Componente raíz
+│   └── index.tsx              # Punto de entrada de la aplicación
+├── .github/
+│   └── workflows/             # Pipelines CI/CD
+├── angular.json               # Configuración de Angular
+├── vite.config.ts             # Configuración del bundler Vite
+└── package.json
+```
+
+### Estándares de Código
+
+#### TypeScript & Documentación
+- **Tipado Completo**: Todo el código debe estar correctamente tipado
+- **Sin `any` types**: Usar tipado apropiado o `unknown` cuando sea necesario
+- **Code Quality**: Seguir los principios de Clean Code
+
+#### Estilo & Formato
+- **Prettier**: Formato automático de código
+- **ESLint**: Reglas de linting personalizadas
+- **Tailwind CSS**: Estilos utility-first
+- **Soporte de Tema**: Todos los estilos deben soportar modo dark/light
+
+#### Convenciones de Commits
+Seguir [Conventional Commits](https://www.conventionalcommits.org/):
+```bash
+feat(game): add new power-up mechanic
+fix(input): resolve keyboard event handling
+docs(readme): update installation instructions
+test(utils): add piece rotation tests
+refactor(services): improve game loop performance
+```
+
+---
+
+## Pruebas
+
+### Pruebas Unitarias (Vitest)
+
+```bash
+npm test                    # Ejecutar todas las pruebas
+npm run test:ui             # Interfaz interactiva
+npm run test:coverage       # Generar reporte de cobertura
+```
+
+- **Requisito de Cobertura**: ≥80% líneas/ramas/funciones
+- **Ubicación**: Las pruebas están colocadas junto a los archivos fuente (`*.spec.ts`)
+- **Reportes**: Reportes de cobertura HTML en `./coverage/`
+
+**Ejecutar pruebas específicas:**
+```bash
+npm test -- src/services/game-loop.service.spec.ts
+```
+
+### Arquitectura de Pruebas
+
+**Componentes Principales Probados:**
+- `GameLoopService`: Ciclo principal del juego
+- `GameFacadeService`: Orquestación de servicios
+- `InputService`: Manejo de controles de usuario
+- `AnimationService`: Sistema de animaciones
+- `PowerUpService`: Sistema de poderes
+- Utilidades: piece.utils, board.utils, game-logic.utils
+
+---
+
+## Despliegue
+
+### Ambientes
+
+| Ambiente | Rama | URL | Trigger de Deploy |
+|----------|------|-----|-------------------|
+| **Production** | `development` | TBD | Merge a `development` |
+| **Preview** | Ramas PR | TBD | Creación de PR |
+
+### Pipeline CI/CD
+
+**GitHub Actions** workflow (`.github/workflows/`):
+1. **Build Once**: Build de producción único
+2. **Parallel Jobs**: Linting y pruebas unitarias en paralelo
+3. **Coverage Check**: Verifica threshold ≥80%
+4. **Deploy**: Despliegue automático (cuando se configure)
+
+### Despliegue Manual
+
+```bash
+# Construir bundle de producción
+npm run build
+
+# Los archivos están en dist/ listos para despliegue
+```
+
+---
+
+## Controles del Juego
+
+### Teclado
 
 | Tecla(s)    | Acción                      |
 |-------------|-----------------------------|
-| `◄ ►`       | Mover Fragmento Lateralmente|
-| `▲`         | Rotar Fragmento             |
+| `◄ ►`       | Mover Pieza Lateralmente    |
+| `▲`         | Rotar Pieza                 |
 | `▼`         | Acelerar Descenso           |
-| `Espacio`   | Zambullida en el Abismo     |
-| `C`         | Secuestrar Fragmento (Hold) |
-| `P`         | Suspender el Tiempo (Pausa) |
-| `1` - `4`   | Invocar Poder               |
+| `Espacio`   | Caída Instantánea           |
+| `C`         | Guardar Pieza (Hold)        |
+| `P`         | Pausar Juego                |
+| `1` - `4`   | Usar Poder                  |
+
+### Controles Táctiles
+
+- **Swipe Izquierda/Derecha**: Mover pieza
+- **Tap**: Rotar pieza
+- **Swipe Abajo**: Acelerar caída
+- **Botones de Poder**: Toca para activar
 
 ---
-## La Invocación: Cómo Comenzar Tu Prueba
 
-1.  Abre el portal arcano (tu navegador web).
-2.  Concentra tu voluntad.
-3.  Presiona **Start Game**.
-4.  Teje tu destino.
+## Contribuir
+
+¡Las contribuciones son bienvenidas! Por favor sigue estas guías:
+
+### Antes de Contribuir
+
+1. **Lee la Documentación**: Revisa [AGENTS.md](./AGENTS.md) para guías operacionales
+2. **Revisa Issues**: Busca issues existentes o crea uno nuevo
+3. **Fork del Repositorio**: Crea tu propio fork
+
+### Workflow de Desarrollo
+
+1. **Crear Rama**: `git checkout -b feat/mi-feature`
+2. **Desarrollar**: Sigue estándares de código y añade pruebas
+3. **Probar**: Asegura que el 100% del pipeline pase
+   ```bash
+   npm run lint
+   npm test
+   npm run build
+   ```
+4. **Commit**: Usa mensajes de commit convencionales
+5. **Push**: `git push origin feat/mi-feature`
+6. **Pull Request**: Con descripción clara y screenshots para cambios UI
+
+### Proceso de Revisión de Código
+
+- Todos los PRs requieren pasar las verificaciones de CI/CD
+- El código debe mantener ≥80% de cobertura de pruebas
+- Al menos una aprobación de mantenedor requerida
+
+---
+
+## Resolución de Problemas
+
+### Problemas Comunes
+
+**Puerto ya en uso**
+```bash
+npx kill-port 4200
+```
+
+**Problemas de dependencias**
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+**Errores de TypeScript**
+```bash
+npx tsc --noEmit  # Verificar sin construir
+```
+
+**Fallas en pruebas**
+```bash
+npm test -- --reporter=verbose  # Output detallado
+npm run test:ui                 # Debugging interactivo
+```
+
+---
+
+## Arquitectura Destacada
+
+### Patrones Modernos de Angular
+
+- **Zoneless**: Sin dependencia de Zone.js para mejor rendimiento
+- **Signals**: Gestión de estado reactivo con Angular signals
+- **Standalone Components**: Arquitectura modular y tree-shakeable
+- **OnPush Detection**: Estrategia de detección de cambios optimizada
+- **Dependency Injection**: Arquitectura basada en servicios
+
+### Optimizaciones de Rendimiento
+
+- **Vite**: Builds de desarrollo y producción ultra-rápidos
+- **Lazy Loading**: Componentes cargados bajo demanda
+- **Renderizado Eficiente**: OnPush + signals minimizan re-renders
+- **RequestAnimationFrame**: Animaciones suaves y eficientes
+
+---
+
+## Herramientas IA
+
+### Archivo Aplanado del Repositorio
+
+Este proyecto genera automáticamente un **archivo aplanado del repositorio** (`flattened_Tetros_*.txt`) que contiene todo el código base en un solo archivo de texto. Esto es particularmente útil para asistentes de IA y modelos de lenguaje grandes (LLMs).
+
+#### ¿Qué es el Archivo Aplanado?
+
+El archivo aplanado es una instantánea completa del repositorio que incluye:
+- Todos los archivos de código fuente con delimitadores claros
+- Archivos de configuración (package.json, tsconfig.json, etc.)
+- Archivos de documentación
+- Metadata (rama, commit hash, timestamp de generación)
+
+**Ejemplo de encabezado:**
+```
+==================================
+FLATTENED: Tetros
+Type: Game Project
+Generated at: Tue Oct 22 19:16:20 UTC 2025
+Branch: main
+Commit: d591534226351c245c3cd523f8b2b71cdd716a70
+Repository: judasane/Tetros
+==================================
+```
+
+#### Casos de Uso
+
+**Para Asistentes de IA:**
+- Proporciona contexto completo del proyecto en un solo archivo
+- Permite mejores sugerencias de código y comprensión
+- Ayuda con refactorización entre archivos y análisis
+- Útil para generar documentación completa
+
+**Para Desarrolladores:**
+- Vista rápida del proyecto y búsqueda de código
+- Debugging y análisis
+- Preparación de code reviews
+- Documentación y archivo del proyecto
+- Compartir contexto completo con herramientas externas
+
+**Para Análisis de Código:**
+- Herramientas de análisis estático
+- Métricas de calidad de código
+- Análisis de dependencias
+- Detección de patrones
+
+#### Cómo Funciona
+
+El archivo aplanado se genera automáticamente por CI/CD:
+1. **Trigger**: En cada push a ramas principales
+2. **Generación**: GitHub Actions procesa todos los archivos
+3. **Formato**: Cada archivo está claramente delimitado con marcadores de inicio/fin
+4. **Almacenamiento**: Commiteado al repositorio con timestamp en el nombre
+
+#### Formato del Archivo
+
+```
+--- START OF FILE: path/to/file.ts ---
+[contenido del archivo]
+--- END OF FILE: path/to/file.ts ---
+
+--- START OF FILE: path/to/another.ts ---
+[contenido del archivo]
+--- END OF FILE: path/to/another.ts ---
+```
+
+#### Usando con Herramientas de IA
+
+**Con Claude Code / Asistentes de IA:**
+```bash
+# El AI puede referenciar el archivo aplanado para contexto completo
+"Por favor revisa el archivo flattened_Tetros_*.txt para la estructura del proyecto"
+```
+
+**Beneficios:**
+- ✅ Un solo archivo = contexto completo
+- ✅ No necesidad de cargar archivos uno por uno
+- ✅ Preserva estructura de archivos y relaciones
+- ✅ Incluye metadata para versionado
+- ✅ Excelente para análisis offline
+
+> **Nota**: El archivo aplanado se regenera en cada despliegue para mantenerlo sincronizado con el código más reciente.
+
+---
+
+## Recursos
+
+- **[AGENTS.md](./AGENTS.md)** - Guías operacionales de agentes de IA y estándares de desarrollo
+- **[Angular Docs](https://angular.dev/)** - Documentación oficial de Angular
+- **[Vite Guide](https://vitejs.dev/)** - Documentación de la herramienta de build Vite
+- **[Vitest Docs](https://vitest.dev/)** - Framework de pruebas unitarias
+- **[Tailwind CSS](https://tailwindcss.com/)** - Framework CSS utility-first
+
+---
+
+## Licencia
+
+MIT License © 2025 Judas Añe
+
+---
+
+## Soporte
+
+- **Issues**: [GitHub Issues](https://github.com/judasane/Tetros/issues)
+- **Contacto**: [@judasane](https://x.com/judasane)
+
+---
+
+<div align="center">
+
+**Construido con Angular 20 • Impulsado por Vite • Probado con Vitest**
 
 > *El universo espera a su maestro. ¿Aceptarás el desafío o te perderás en la interminable cascada del caos?*
+
+</div>
+
 --- END OF FILE: README.md ---
 
 --- START OF FILE: angular.json ---
@@ -246,7 +1127,7 @@ Para comandar los fragmentos celestiales, debes dominar estos antiguos ritos:
               "browser": "."
             },
             "browser": "index.tsx",
-            "tsConfig": "tsconfig.json",
+            "tsConfig": "tsconfig.app.json",
             "assets": [
               {
                 "glob": "**/*",
@@ -279,6 +1160,15 @@ Para comandar los fragmentos celestiales, debes dominar estos antiguos ritos:
             }
           },
           "defaultConfiguration": "development"
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "src/**/*.ts",
+              "src/**/*.html"
+            ]
+          }
         }
       }
     }
@@ -420,7 +1310,10 @@ bootstrapApplication(AppComponent, {
     "dev": "ng serve",
     "build": "ng build",
     "preview": "ng serve --configuration=production",
-    "test": "vitest"
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "lint": "ng lint"
   },
   "dependencies": {
     "@angular/build": "^20.1.0",
@@ -437,12 +1330,27 @@ bootstrapApplication(AppComponent, {
     "zone.js": "^0.15.0"
   },
   "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^1.9.0",
+    "@angular-eslint/builder": "^18.1.0",
+    "@angular-eslint/eslint-plugin": "^18.1.0",
+    "@angular-eslint/eslint-plugin-template": "^18.1.0",
+    "@angular-eslint/template-parser": "^18.1.0",
     "@types/node": "^22.14.0",
+    "@typescript-eslint/eslint-plugin": "^7.17.0",
+    "@typescript-eslint/parser": "^7.17.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
+    "eslint": "^8.57.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-jsdoc": "^48.8.1",
+    "eslint-plugin-prefer-arrow": "^1.2.3",
+    "jsdom": "^24.1.1",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
-    "vitest": "^3.1.1",
-    "jsdom": "^24.1.1",
-    "@analogjs/vite-plugin-angular": "^1.9.0"
+    "vitest": "^3.1.1"
+  },
+  "overrides": {
+    "chokidar": "3.6.0"
   }
 }
 --- END OF FILE: package.json ---
@@ -546,11 +1454,7 @@ bootstrapApplication(AppComponent, {
       </div>
 
       <!-- Game Board & Overlay -->
-      <div 
-        class="relative shadow-2xl shadow-cyan-500/20 border-4 border-slate-700 rounded-lg"
-        (touchstart)="handleTouchStart($event)"
-        (touchmove)="handleTouchMove($event)"
-        (touchend)="handleTouchEnd($event)">
+      <div class="relative shadow-2xl shadow-cyan-500/20 border-4 border-slate-700 rounded-lg">
         <app-board 
             [board]="game.board()" 
             [currentPiece]="game.currentPiece()" 
@@ -563,7 +1467,7 @@ bootstrapApplication(AppComponent, {
             [gameState]="game.gameState()"
             [countdownValue]="game.countdownValue()"
             [animationMode]="game.animationMode()"
-            (start)="game.startGame()" 
+            (startEvent)="game.startGame()"
             (restart)="game.startGame()"
             (togglePause)="game.togglePause()"
             (toggleAnimation)="game.toggleAnimationMode()"
@@ -609,11 +1513,235 @@ bootstrapApplication(AppComponent, {
             </div>
         </app-info-panel>
       </div>
+
+      <!-- Spacer -->
+      <div class="flex-grow"></div>
+
+      <!-- Instructions -->
+      <div class="w-full">
+        <app-instructions [isDesktop]="isDesktop()" />
+      </div>
+
+      <!-- Mobile Controls: Only visible on mobile -->
+      @if (!isDesktop()) {
+        <div class="w-full">
+            <app-info-panel>
+                <div class="grid grid-cols-3 gap-2 text-center">
+                  @for (control of mobileControls; track control.label) {
+                    <button
+                      (click)="control.action()"
+                      [disabled]="control.disabled()"
+                      [attr.aria-label]="control.ariaLabel"
+                      class="p-2 border-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed h-12 flex justify-center items-center border-slate-600 text-slate-300">
+                      {{ control.label }}
+                    </button>
+                  }
+                </div>
+            </app-info-panel>
+        </div>
+      }
       
     </div>
   </div>
 </div>
 --- END OF FILE: src/app.component.html ---
+
+--- START OF FILE: src/app.component.spec.ts ---
+import { TestBed, ComponentFixture } from '@angular/core/testing';
+import { signal } from '@angular/core';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+import { AppComponent } from './app.component';
+import { GameFacade } from './services/game.facade';
+import { GameState } from './utils/game-state.interface';
+
+import { createEmptyBoard } from './utils/board.utils';
+
+// Mock GameFacade
+class MockGameFacade {
+  // Methods to be spied on
+  rotate = vi.fn();
+  moveLeft = vi.fn();
+  moveRight = vi.fn();
+  hardDrop = vi.fn();
+  softDrop = vi.fn();
+  startGame = vi.fn();
+  togglePause = vi.fn();
+  toggleAnimationMode = vi.fn();
+  activatePowerUp = vi.fn();
+  canUsePowerUp = vi.fn(() => true);
+  hold = vi.fn();
+
+  // Signals needed by the template
+  board = signal(createEmptyBoard());
+  currentPiece = signal(null);
+  ghostPiece = signal(null);
+  animationMode = signal<'smooth' | 'step'>('smooth');
+  dropProgress = signal(0);
+  gameState = signal<GameState>('playing');
+  countdownValue = signal(0);
+  holdPiece = signal(null);
+  nextPiece = signal(null);
+  score = signal(0);
+  level = signal(1);
+  linesCleared = signal(0);
+}
+
+// Helper to create a TouchEvent in JSDOM where `Touch` is not defined
+const createTouchEvent = (type: string, x: number, y: number): TouchEvent => {
+  const touchPoint = { clientX: x, clientY: y };
+  const event = new TouchEvent(type, {
+    bubbles: true,
+    cancelable: true,
+  });
+
+  Object.defineProperty(event, 'touches', { value: [touchPoint], configurable: true });
+  Object.defineProperty(event, 'changedTouches', { value: [touchPoint], configurable: true });
+
+  // Add a generic target to prevent 'closest' of null error in tests
+  Object.defineProperty(event, 'target', { value: document.createElement('div'), configurable: true });
+
+  return event;
+};
+
+
+describe('AppComponent', () => {
+  let fixture: ComponentFixture<AppComponent>;
+  let component: AppComponent;
+  let facade: MockGameFacade; // Use the mock class directly for type safety
+  let element: HTMLElement;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [AppComponent],
+      providers: [{ provide: GameFacade, useClass: MockGameFacade }],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(AppComponent);
+    component = fixture.componentInstance;
+    facade = TestBed.inject(GameFacade) as MockGameFacade;
+    element = fixture.nativeElement; // Events are now on the host element
+    fixture.detectChanges();
+  });
+
+  describe('Touch Gestures', () => {
+    beforeEach(() => {
+      // Set a fixed cell size for predictable thresholds
+      component.cellSize.set(20);
+      vi.useFakeTimers();
+      // Set game state to playing for handlers to execute
+      facade.gameState.set('playing');
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('should call game.rotate() on a tap', () => {
+      component.handleTouchStart(createTouchEvent('touchstart', 100, 100));
+      vi.advanceTimersByTime(50); // Short time delta
+      component.handleTouchEnd(createTouchEvent('touchend', 105, 105)); // Small position delta
+
+      expect(facade.rotate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call game.moveRight() on a right swipe', () => {
+      component.handleTouchStart(createTouchEvent('touchstart', 100, 100));
+      // Move needs to be > 80% of cell size (0.8 * 20 = 16)
+      component.handleTouchMove(createTouchEvent('touchmove', 117, 101));
+
+      expect(facade.moveRight).toHaveBeenCalledTimes(1);
+      expect(facade.moveLeft).not.toHaveBeenCalled();
+    });
+
+    it('should call game.moveLeft() on a left swipe', () => {
+      component.handleTouchStart(createTouchEvent('touchstart', 100, 100));
+      component.handleTouchMove(createTouchEvent('touchmove', 83, 101));
+
+      expect(facade.moveLeft).toHaveBeenCalledTimes(1);
+      expect(facade.moveRight).not.toHaveBeenCalled();
+    });
+
+    it('should call game.hardDrop() on a fast downward swipe', () => {
+      component.handleTouchStart(createTouchEvent('touchstart', 100, 100));
+      vi.advanceTimersByTime(100); // Fast swipe
+      // Long downward swipe (threshold is 30 * 2.5 = 75)
+      component.handleTouchEnd(createTouchEvent('touchend', 105, 180));
+
+      expect(facade.hardDrop).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call game.softDrop() on a downward move', () => {
+      component.handleTouchStart(createTouchEvent('touchstart', 100, 100));
+      // Move > 16px down
+      component.handleTouchMove(createTouchEvent('touchmove', 101, 117));
+
+      expect(facade.softDrop).toHaveBeenCalledTimes(1);
+    });
+
+    it('should NOT call rotate() on a long press (tap time exceeded)', () => {
+      component.handleTouchStart(createTouchEvent('touchstart', 100, 100));
+      vi.advanceTimersByTime(300); // Exceeds tap time threshold
+      component.handleTouchEnd(createTouchEvent('touchend', 105, 105));
+
+      expect(facade.rotate).not.toHaveBeenCalled();
+    });
+
+    it('should not process gestures if game state is not "playing"', () => {
+        facade.gameState.set('paused'); // or 'start', 'gameOver', etc.
+
+        component.handleTouchStart(createTouchEvent('touchstart', 100, 100));
+        component.handleTouchMove(createTouchEvent('touchmove', 120, 100));
+        component.handleTouchEnd(createTouchEvent('touchend', 120, 100));
+
+        expect(facade.moveRight).not.toHaveBeenCalled();
+        expect(facade.rotate).not.toHaveBeenCalled();
+    });
+
+    it('should lock to horizontal movement and ignore vertical', () => {
+        component.handleTouchStart(createTouchEvent('touchstart', 100, 100));
+        // Initial horizontal move to lock the gesture
+        component.handleTouchMove(createTouchEvent('touchmove', 120, 101));
+        // Subsequent vertical move that should be ignored
+        component.handleTouchMove(createTouchEvent('touchmove', 120, 120));
+
+        expect(facade.moveRight).toHaveBeenCalledTimes(1);
+        expect(facade.softDrop).not.toHaveBeenCalled();
+    });
+
+    it('should lock to vertical movement and ignore horizontal', () => {
+        component.handleTouchStart(createTouchEvent('touchstart', 100, 100));
+        // Initial vertical move to lock the gesture
+        component.handleTouchMove(createTouchEvent('touchmove', 101, 120));
+        // Subsequent horizontal move that should be ignored
+        component.handleTouchMove(createTouchEvent('touchmove', 125, 120));
+
+        expect(facade.softDrop).toHaveBeenCalledTimes(1);
+        expect(facade.moveRight).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Mobile Controls', () => {
+    it('should call game.hold() when hold button is clicked', () => {
+        const holdControl = component.mobileControls.find(c => c.label === 'Hold');
+        holdControl?.action();
+        expect(facade.hold).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call game.togglePause() when pause button is clicked', () => {
+        const pauseControl = component.mobileControls.find(c => c.label === 'Pause');
+        pauseControl?.action();
+        expect(facade.togglePause).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call game.rotate() when rotate button is clicked', () => {
+        const rotateControl = component.mobileControls.find(c => c.label === 'Rotate');
+        rotateControl?.action();
+        expect(facade.rotate).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+--- END OF FILE: src/app.component.spec.ts ---
 
 --- START OF FILE: src/app.component.ts ---
 /**
@@ -625,6 +1753,7 @@ import { BoardComponent } from './components/board/board.component';
 import { GameOverlayComponent } from './components/game-overlay/game-overlay.component';
 import { InfoPanelComponent } from './components/info-panel/info-panel.component';
 import { PiecePreviewComponent } from './components/piece-preview/piece-preview.component';
+import { InstructionsComponent } from './components/instructions/instructions.component';
 import { COLS, ROWS } from './utils/constants';
 
 /**
@@ -642,12 +1771,16 @@ import { COLS, ROWS } from './utils/constants';
     GameOverlayComponent,
     InfoPanelComponent,
     PiecePreviewComponent,
+    InstructionsComponent,
   ],
   providers: [],
   host: {
     '(window:keydown)': 'handleKeyDown($event)',
     '(window:keyup)': 'handleKeyUp($event)',
-    '(window:resize)': 'updateCellSize()'
+    '(window:resize)': 'updateCellSize()',
+    '(touchstart)': 'handleTouchStart($event)',
+    '(touchmove)': 'handleTouchMove($event)',
+    '(touchend)': 'handleTouchEnd($event)',
   }
 })
 export class AppComponent implements OnInit {
@@ -663,12 +1796,20 @@ export class AppComponent implements OnInit {
   /** A computed signal for the total width of the game board in pixels. */
   boardWidth = computed(() => COLS * this.cellSize());
 
+  /** A configuration array for mobile control buttons. */
+  mobileControls = [
+    { label: 'Hold', action: () => this.game.hold(), disabled: () => !this.game.isHoldingAllowed(), ariaLabel: 'Hold current piece' },
+    { label: 'Pause', action: () => this.game.togglePause(), disabled: () => false, ariaLabel: 'Pause or resume the game' },
+    { label: 'Rotate', action: () => this.game.rotate(), disabled: () => false, ariaLabel: 'Rotate current piece' }
+  ];
+
   // --- Touch Gesture State ---
   private touchStartX = 0;
   private touchStartY = 0;
   private touchStartTime = 0;
   private lastMoveX = 0;
   private lastMoveY = 0;
+  private gestureLock: 'horizontal' | 'vertical' | null = null;
   private readonly swipeThreshold = 30; // Min pixels for a swipe
   private readonly tapThreshold = 20;   // Max pixels for a tap
   private readonly tapTimeThreshold = 200; // Max ms for a tap
@@ -740,6 +1881,11 @@ export class AppComponent implements OnInit {
    * @param event The TouchEvent.
    */
   handleTouchStart(event: TouchEvent): void {
+    const targetElement = event.target as HTMLElement;
+    if (targetElement.closest('button')) {
+      return; // Ignore gestures starting on a button
+    }
+
     if (this.game.gameState() !== 'playing') return;
     event.preventDefault();
     this.touchStartX = event.touches[0].clientX;
@@ -747,6 +1893,7 @@ export class AppComponent implements OnInit {
     this.touchStartTime = Date.now();
     this.lastMoveX = this.touchStartX;
     this.lastMoveY = this.touchStartY;
+    this.gestureLock = null; // Reset gesture lock
   }
 
   /**
@@ -756,20 +1903,30 @@ export class AppComponent implements OnInit {
   handleTouchMove(event: TouchEvent): void {
     if (this.game.gameState() !== 'playing') return;
     event.preventDefault();
+
     const touchX = event.touches[0].clientX;
     const touchY = event.touches[0].clientY;
-
     const deltaX = touchX - this.lastMoveX;
     const deltaY = touchY - this.lastMoveY;
     
     const horizontalMoveThreshold = this.cellSize() * 0.8;
     const verticalMoveThreshold = this.cellSize() * 0.8;
 
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > horizontalMoveThreshold) {
+    // Determine gesture direction and lock it if not already locked
+    if (!this.gestureLock) {
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > horizontalMoveThreshold) {
+        this.gestureLock = 'horizontal';
+      } else if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > verticalMoveThreshold) {
+        this.gestureLock = 'vertical';
+      }
+    }
+
+    // Execute action based on the locked gesture
+    if (this.gestureLock === 'horizontal' && Math.abs(deltaX) > horizontalMoveThreshold) {
       if (deltaX > 0) this.game.moveRight();
       else this.game.moveLeft();
       this.lastMoveX = touchX;
-    } else if (Math.abs(deltaY) > Math.abs(deltaX) && deltaY > verticalMoveThreshold) {
+    } else if (this.gestureLock === 'vertical' && deltaY > verticalMoveThreshold) {
       this.game.softDrop();
       this.lastMoveY = touchY;
     }
@@ -872,7 +2029,7 @@ export class BoardComponent {
   readonly COLS = COLS;
   
   /** The 2D array representing the static, locked-in pieces on the board. */
-  boardInput = input.required<number[][]>({ alias: 'board' });
+  board = input.required<number[][]>();
   
   /** The currently falling piece, or null if none. */
   currentPiece = input.required<Piece | null>();
@@ -890,7 +2047,7 @@ export class BoardComponent {
   cellSize = input<number>(32);
 
   /** A computed signal that directly passes the board input to the template. */
-  boardToRender = computed(() => this.boardInput());
+  boardToRender = computed(() => this.board());
 }
 
 --- END OF FILE: src/components/board/board.component.ts ---
@@ -907,6 +2064,60 @@ export class BoardComponent {
 </div>
 
 --- END OF FILE: src/components/cell/cell.component.html ---
+
+--- START OF FILE: src/components/cell/cell.component.spec.ts ---
+import { TestBed, ComponentFixture } from '@angular/core/testing';
+import { describe, it, expect, beforeEach } from 'vitest';
+
+import { CellComponent } from './cell.component';
+import { PIECE_COLORS } from '../../utils/constants';
+
+describe('CellComponent', () => {
+  let fixture: ComponentFixture<CellComponent>;
+  let component: CellComponent;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [CellComponent],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(CellComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('should return the correct class for an empty cell (value 0)', () => {
+    fixture.componentRef.setInput('value', 0);
+    fixture.detectChanges();
+    expect(component.cellClass()).toBe('bg-slate-800');
+  });
+
+  it('should return the correct class for a locked piece (value > 0)', () => {
+    const pieceColorIndex = 1; // Corresponds to 'cyan'
+    fixture.componentRef.setInput('value', pieceColorIndex);
+    fixture.detectChanges();
+    const expectedColor = PIECE_COLORS[pieceColorIndex];
+    expect(component.cellClass()).toBe(`bg-${expectedColor} shadow-inner shadow-white/20`);
+  });
+
+  it('should return the correct class for a ghost piece (value -1)', () => {
+    fixture.componentRef.setInput('value', -1);
+    fixture.detectChanges();
+    expect(component.cellClass()).toBe('bg-slate-500/30 border border-slate-400/50');
+  });
+
+  it('should return the correct class for an aimer target (value -2)', () => {
+    fixture.componentRef.setInput('value', -2);
+    fixture.detectChanges();
+    expect(component.cellClass()).toBe('bg-yellow-500/70 animate-pulse border-2 border-yellow-300');
+  });
+
+  it('should return the correct class for a line clearing animation (value -3)', () => {
+    fixture.componentRef.setInput('value', -3);
+    fixture.detectChanges();
+    expect(component.cellClass()).toBe('animate-line-clear');
+  });
+});
+--- END OF FILE: src/components/cell/cell.component.spec.ts ---
 
 --- START OF FILE: src/components/cell/cell.component.ts ---
 /**
@@ -992,6 +2203,101 @@ export class CellComponent {
 </div>
 
 --- END OF FILE: src/components/falling-piece/falling-piece.component.html ---
+
+--- START OF FILE: src/components/falling-piece/falling-piece.component.spec.ts ---
+import { TestBed, ComponentFixture } from '@angular/core/testing';
+import { describe, it, expect, beforeEach } from 'vitest';
+
+import { FallingPieceComponent } from './falling-piece.component';
+import { Piece } from '../../utils/piece.interface';
+
+const MOCK_PIECE: Piece = {
+    x: 3,
+    y: 5,
+    shape: [[1, 1], [1, 1]],
+};
+
+describe('FallingPieceComponent', () => {
+  let fixture: ComponentFixture<FallingPieceComponent>;
+  let component: FallingPieceComponent;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [FallingPieceComponent],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(FallingPieceComponent);
+    component = fixture.componentInstance;
+
+    // Set required inputs
+    fixture.componentRef.setInput('piece', MOCK_PIECE);
+    fixture.componentRef.setInput('cellSize', 20); // Use an easy-to-calculate number
+  });
+
+  describe('position signal', () => {
+    it('should calculate correct left and top in pixels', () => {
+      fixture.componentRef.setInput('animationMode', 'step'); // No yOffset
+      fixture.detectChanges();
+
+      const pos = component.position();
+      expect(pos.left).toBe(MOCK_PIECE.x * 20); // 3 * 20 = 60
+      expect(pos.top).toBe(MOCK_PIECE.y * 20);  // 5 * 20 = 100
+    });
+
+    it('should apply yOffset to top when in "smooth" mode and not a ghost', () => {
+      fixture.componentRef.setInput('animationMode', 'smooth');
+      fixture.componentRef.setInput('isGhost', false);
+      fixture.componentRef.setInput('dropProgress', 0.5);
+      fixture.detectChanges();
+
+      const pos = component.position();
+      expect(pos.left).toBe(60);
+      // top = (y + yOffset) * cellSize = (5 + 0.5) * 20 = 110
+      expect(pos.top).toBe(110);
+    });
+
+    it('should NOT apply yOffset when it is a ghost piece, even in "smooth" mode', () => {
+        fixture.componentRef.setInput('animationMode', 'smooth');
+        fixture.componentRef.setInput('isGhost', true);
+        fixture.componentRef.setInput('dropProgress', 0.5);
+        fixture.detectChanges();
+
+        const pos = component.position();
+        expect(pos.top).toBe(100); // yOffset is ignored
+      });
+  });
+
+  describe('transitionStyle signal', () => {
+    it('should return "left..." for "smooth" mode when not a ghost', () => {
+        fixture.componentRef.setInput('animationMode', 'smooth');
+        fixture.componentRef.setInput('isGhost', false);
+        fixture.detectChanges();
+
+        expect(component.transitionStyle()).toContain('left');
+        expect(component.transitionStyle()).not.toContain('all');
+    });
+
+    it('should return "all..." for "step" mode', () => {
+        fixture.componentRef.setInput('animationMode', 'step');
+        fixture.componentRef.setInput('isGhost', false);
+        fixture.detectChanges();
+
+        expect(component.transitionStyle()).toContain('all');
+    });
+
+    it('should return "all..." for a ghost piece, regardless of mode', () => {
+        fixture.componentRef.setInput('animationMode', 'smooth');
+        fixture.componentRef.setInput('isGhost', true);
+        fixture.detectChanges();
+        expect(component.transitionStyle()).toContain('all');
+
+        fixture.componentRef.setInput('animationMode', 'step');
+        fixture.detectChanges();
+        expect(component.transitionStyle()).toContain('all');
+    });
+  });
+});
+--- END OF FILE: src/components/falling-piece/falling-piece.component.spec.ts ---
 
 --- START OF FILE: src/components/falling-piece/falling-piece.component.ts ---
 /**
@@ -1174,7 +2480,7 @@ export class GameOverlayComponent {
   animationMode = input<'step' | 'smooth'>('smooth');
 
   /** Emits when the "Start Game" button is clicked. */
-  start = output<void>();
+  startEvent = output<void>();
   
   /** Emits when a "Restart" or "Play Again" button is clicked. */
   restart = output<void>();
@@ -1224,6 +2530,90 @@ export class InfoPanelComponent {
   title = input<string | undefined>();
 }
 --- END OF FILE: src/components/info-panel/info-panel.component.ts ---
+
+--- START OF FILE: src/components/instructions/instructions.component.spec.ts ---
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { InstructionsComponent } from './instructions.component';
+import { InfoPanelComponent } from '../info-panel/info-panel.component';
+import { By } from '@angular/platform-browser';
+
+describe('InstructionsComponent', () => {
+  let component: InstructionsComponent;
+  let fixture: ComponentFixture<InstructionsComponent>;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [InstructionsComponent, InfoPanelComponent],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InstructionsComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should display desktop instructions when isDesktop is true', () => {
+    component.isDesktop = true;
+    fixture.detectChanges();
+    const listElements = fixture.debugElement.queryAll(By.css('li'));
+    expect(listElements.length).toBe(6);
+    expect(listElements[0].nativeElement.textContent).toContain('Left/Right:');
+  });
+
+  it('should display mobile instructions when isDesktop is false', () => {
+    component.isDesktop = false;
+    fixture.detectChanges();
+    const listElements = fixture.debugElement.queryAll(By.css('li'));
+    expect(listElements.length).toBe(6);
+    expect(listElements[0].nativeElement.textContent).toContain('Swipe Left/Right:');
+  });
+});
+--- END OF FILE: src/components/instructions/instructions.component.spec.ts ---
+
+--- START OF FILE: src/components/instructions/instructions.component.ts ---
+import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import { InfoPanelComponent } from '../info-panel/info-panel.component';
+
+@Component({
+  selector: 'app-instructions',
+  template: `
+    <app-info-panel title="How to Play">
+      @if (isDesktop) {
+        <div class="p-2 text-slate-300">
+          <ul class="list-disc list-inside">
+            <li><span class="font-bold text-yellow-400">Left/Right:</span> Move piece</li>
+            <li><span class="font-bold text-yellow-400">Down:</span> Soft drop</li>
+            <li><span class="font-bold text-yellow-400">Space:</span> Hard drop</li>
+            <li><span class="font-bold text-yellow-400">Up:</span> Rotate</li>
+            <li><span class="font-bold text-yellow-400">C:</span> Hold piece</li>
+            <li><span class="font-bold text-yellow-400">P:</span> Pause game</li>
+          </ul>
+        </div>
+      } @else {
+        <div class="p-2 text-slate-300">
+          <ul class="list-disc list-inside">
+            <li><span class="font-bold text-yellow-400">Swipe Left/Right:</span> Move piece</li>
+            <li><span class="font-bold text-yellow-400">Swipe Down:</span> Soft drop</li>
+            <li><span class="font-bold text-yellow-400">Fast Swipe Down:</span> Hard drop</li>
+            <li><span class="font-bold text-yellow-400">Tap:</span> Rotate</li>
+            <li><span class="font-bold text-yellow-400">"Hold" Button:</span> Hold piece</li>
+            <li><span class="font-bold text-yellow-400">"Pause" Button:</span> Pause game</li>
+          </ul>
+        </div>
+      }
+    </app-info-panel>
+  `,
+  styles: [],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  standalone: true,
+  imports: [InfoPanelComponent]
+})
+export class InstructionsComponent {
+  @Input() isDesktop = true;
+}
+--- END OF FILE: src/components/instructions/instructions.component.ts ---
 
 --- START OF FILE: src/components/piece-preview/piece-preview.component.css ---
 /* Component-specific styles for PiecePreviewComponent can go here. */
@@ -1343,6 +2733,122 @@ Para agregar un nuevo power-up:
 3. Mapear tecla en InputService (opcional)
 
 --- END OF FILE: src/services/README.md ---
+
+--- START OF FILE: src/services/animation.service.spec.ts ---
+import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
+import { describe, it, expect, beforeEach } from 'vitest';
+
+import { AnimationService } from './animation.service';
+import { GameStateService } from './game-state.service';
+import { Piece } from '../utils/piece.interface';
+import { createEmptyBoard } from '../utils/board.utils';
+import { GameState } from '../utils/game-state.interface';
+
+// Mock GameStateService
+class MockGameStateService {
+  currentPiece = signal<Piece | null>(null);
+  board = signal<number[][]>(createEmptyBoard());
+  gameState = signal<GameState>('playing');
+  animationMode = signal<'smooth' | 'step'>('smooth');
+
+  // Helper methods to update signals in tests
+  setCurrentPiece(piece: Piece | null) {
+    this.currentPiece.set(piece);
+  }
+  setBoard(board: number[][]) {
+    this.board.set(board);
+  }
+  setGameState(state: GameState) {
+    this.gameState.set(state);
+  }
+}
+
+describe('AnimationService', () => {
+  let service: AnimationService;
+  let gameStateService: MockGameStateService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        AnimationService,
+        { provide: GameStateService, useClass: MockGameStateService },
+      ],
+    });
+
+    service = TestBed.inject(AnimationService);
+    gameStateService = TestBed.inject(GameStateService) as unknown as MockGameStateService;
+  });
+
+  describe('ghostPiece', () => {
+    const testPiece: Piece = { x: 4, y: 0, shape: [[1, 1], [1, 1]] }; // O piece
+
+    it('should be null if there is no current piece', () => {
+      gameStateService.setCurrentPiece(null);
+      expect(service.ghostPiece()).toBeNull();
+    });
+
+    it('should be null if game is not in "playing" state', () => {
+        gameStateService.setCurrentPiece(testPiece);
+        gameStateService.setGameState('paused');
+        expect(service.ghostPiece()).toBeNull();
+        gameStateService.setGameState('gameOver');
+        expect(service.ghostPiece()).toBeNull();
+      });
+
+    it('should calculate the correct landing position on an empty board', () => {
+      gameStateService.setBoard(createEmptyBoard());
+      gameStateService.setCurrentPiece({ ...testPiece, y: 0 }); // Piece at the top
+
+      const ghost = service.ghostPiece();
+      expect(ghost).not.toBeNull();
+      // On an empty 20-row board, an O piece (2 rows high) should land on y=18
+      expect(ghost?.y).toBe(18);
+    });
+
+    it('should calculate the correct landing position on a board with obstacles', () => {
+      const board = createEmptyBoard();
+      // Place an obstacle at y=15
+      board[15][4] = 9;
+      board[15][5] = 9;
+      gameStateService.setBoard(board);
+      gameStateService.setCurrentPiece({ ...testPiece, y: 0 });
+
+      const ghost = service.ghostPiece();
+      expect(ghost).not.toBeNull();
+      // The piece is 2 rows high, obstacle at y=15. It should land right on top of it.
+      // The bottom of the piece (y + height) will be at 15.
+      // So, ghost.y + 2 = 15 -> ghost.y = 13
+      expect(ghost?.y).toBe(13);
+    });
+
+    it('should have the same x position and shape as the current piece', () => {
+        gameStateService.setBoard(createEmptyBoard());
+        gameStateService.setCurrentPiece(testPiece);
+
+        const ghost = service.ghostPiece();
+        expect(ghost).not.toBeNull();
+        expect(ghost?.x).toBe(testPiece.x);
+        expect(ghost?.shape).toEqual(testPiece.shape);
+      });
+  });
+
+  describe('toggleAnimationMode', () => {
+    it('should toggle animationMode from "smooth" to "step"', () => {
+      expect(gameStateService.animationMode()).toBe('smooth');
+      service.toggleAnimationMode();
+      expect(gameStateService.animationMode()).toBe('step');
+    });
+
+    it('should toggle animationMode from "step" to "smooth"', () => {
+      gameStateService.animationMode.set('step');
+      expect(gameStateService.animationMode()).toBe('step');
+      service.toggleAnimationMode();
+      expect(gameStateService.animationMode()).toBe('smooth');
+    });
+  });
+});
+--- END OF FILE: src/services/animation.service.spec.ts ---
 
 --- START OF FILE: src/services/animation.service.ts ---
 import { Injectable, computed, inject } from '@angular/core';
@@ -2000,6 +3506,75 @@ export class GameActionsService {
 
 --- END OF FILE: src/services/game-actions.service.ts ---
 
+--- START OF FILE: src/services/game-loop.service.spec.ts ---
+import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+import { GameLoopService } from './game-loop.service';
+import { GameStateService } from './game-state.service';
+import { GameActionsService } from './game-actions.service';
+import { GameState } from '../utils/game-state.interface';
+
+// Mock GameStateService
+class MockGameStateService {
+  level = signal(1);
+  gameState = signal<GameState>('playing');
+  softDropActive = signal(false);
+  slowMotionActive = signal(false);
+  currentPiece = signal<object | null>({});
+  dropProgress = signal(0);
+}
+
+// Mock GameActionsService
+class MockGameActionsService {
+  tick = vi.fn();
+  canMoveDown = vi.fn(() => true);
+}
+
+describe('GameLoopService', () => {
+  let service: GameLoopService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        GameLoopService,
+        { provide: GameStateService, useClass: MockGameStateService },
+        { provide: GameActionsService, useClass: MockGameActionsService },
+      ],
+    });
+
+    service = TestBed.inject(GameLoopService);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('start() should call requestAnimationFrame', () => {
+    const rAF = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(123);
+    service.start();
+    expect(rAF).toHaveBeenCalledTimes(1);
+  });
+
+  it('stop() should call cancelAnimationFrame if a frame is scheduled', () => {
+    const rAF = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(123);
+    const cAF = vi.spyOn(window, 'cancelAnimationFrame');
+
+    service.start();
+    service.stop();
+
+    expect(cAF).toHaveBeenCalledWith(123);
+  });
+
+  it('stop() should not call cancelAnimationFrame if no frame is scheduled', () => {
+    const cAF = vi.spyOn(window, 'cancelAnimationFrame');
+    service.stop();
+    expect(cAF).not.toHaveBeenCalled();
+  });
+});
+--- END OF FILE: src/services/game-loop.service.spec.ts ---
+
 --- START OF FILE: src/services/game-loop.service.ts ---
 import { Injectable, inject, effect } from '@angular/core';
 import { GameStateService } from './game-state.service';
@@ -2135,6 +3710,184 @@ export class GameStateService {
 
 --- END OF FILE: src/services/game-state.service.ts ---
 
+--- START OF FILE: src/services/game.facade.spec.ts ---
+import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+import { GameFacade } from './game.facade';
+import { GameStateService } from './game-state.service';
+import { GameActionsService } from './game-actions.service';
+import { GameLoopService } from './game-loop.service';
+import { InputService } from './input.service';
+import { PowerUpService } from './power-up.service';
+import { AnimationService } from './animation.service';
+import { GameState } from '../utils/game-state.interface';
+import { createEmptyBoard } from '../utils/board.utils';
+
+// Mock services
+class MockGameStateService {
+    board = signal(createEmptyBoard());
+    currentPiece = signal(null);
+    nextPiece = signal(null);
+    holdPiece = signal(null);
+    gameState = signal<GameState>('start');
+    score = signal(100);
+    level = signal(2);
+    linesCleared = signal(10);
+    isHoldingAllowed = signal(false);
+    powerUps = signal({ laser: 0, slow: 0, mutate: 0, aimer: 0 });
+    isAiming = signal(true);
+    aimerPosition = signal({ x: 0, y: 0 });
+    dropProgress = signal(0.5);
+    countdownValue = signal(0);
+    animationMode = signal<'smooth' | 'step'>('smooth');
+  }
+class MockGameLoopService {
+  start = vi.fn();
+  stop = vi.fn();
+  resetTime = vi.fn();
+}
+class MockInputService {
+  clearTimers = vi.fn();
+  press = vi.fn();
+  release = vi.fn();
+}
+class MockPowerUpService {
+    reset = vi.fn();
+    canUsePowerUp = vi.fn();
+    handleAimerKeys = vi.fn();
+    activatePowerUp = vi.fn();
+}
+class MockGameActionsService {
+    moveLeft = vi.fn();
+    moveRight = vi.fn();
+    softDrop = vi.fn();
+    hardDrop = vi.fn();
+    rotate = vi.fn();
+    hold = vi.fn();
+}
+class MockAnimationService {
+    ghostPiece = signal(null);
+    toggleAnimationMode = vi.fn();
+}
+
+
+describe('GameFacade', () => {
+  let facade: GameFacade;
+  let state: GameStateService;
+  let loop: GameLoopService;
+  let input: InputService;
+  let powerUps: PowerUpService;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    TestBed.configureTestingModule({
+      providers: [
+        GameFacade,
+        { provide: GameStateService, useClass: MockGameStateService },
+        { provide: GameActionsService, useClass: MockGameActionsService },
+        { provide: GameLoopService, useClass: MockGameLoopService },
+        { provide: InputService, useClass: MockInputService },
+        { provide: PowerUpService, useClass: MockPowerUpService },
+        { provide: AnimationService, useClass: MockAnimationService },
+      ],
+    });
+
+    facade = TestBed.inject(GameFacade);
+    state = TestBed.inject(GameStateService);
+    loop = TestBed.inject(GameLoopService);
+    input = TestBed.inject(InputService);
+    powerUps = TestBed.inject(PowerUpService);
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  describe('startGame', () => {
+    it('should reset all game state signals to their initial values', () => {
+        // Set some non-initial values first
+        state.score.set(999);
+        state.level.set(10);
+        state.linesCleared.set(100);
+        state.isHoldingAllowed.set(false);
+        state.gameState.set('gameOver');
+
+        facade.startGame();
+
+        expect(state.score()).toBe(0);
+        expect(state.level()).toBe(1);
+        expect(state.linesCleared()).toBe(0);
+        expect(state.isHoldingAllowed()).toBe(true);
+        expect(state.holdPiece()).toBeNull();
+        expect(state.board()).toEqual(createEmptyBoard());
+        expect(state.currentPiece()).not.toBeNull();
+        expect(state.nextPiece()).not.toBeNull();
+        expect(powerUps.reset).toHaveBeenCalled();
+        expect(input.clearTimers).toHaveBeenCalled();
+    });
+
+    it('should transition gameState from "countdown" to "playing"', async () => {
+        facade.startGame();
+        expect(state.gameState()).toBe('countdown');
+        expect(state.countdownValue()).toBe(3);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(state.countdownValue()).toBe(2);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(state.countdownValue()).toBe(1);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(state.countdownValue()).toBe(0);
+        expect(state.gameState()).toBe('playing');
+    });
+
+    it('should call loop.start() exactly after the countdown finishes', async () => {
+        facade.startGame();
+        expect(loop.start).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(2999);
+        expect(loop.start).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1);
+        expect(loop.resetTime).toHaveBeenCalled();
+        expect(loop.start).toHaveBeenCalledTimes(1);
+      });
+  });
+
+  describe('togglePause', () => {
+    it('should change state to "paused", stop the loop, and clear input timers', () => {
+        state.gameState.set('playing');
+        facade.togglePause();
+
+        expect(state.gameState()).toBe('paused');
+        expect(loop.stop).toHaveBeenCalledTimes(1);
+        expect(input.clearTimers).toHaveBeenCalledTimes(1);
+    });
+
+    it('should change state back to "playing" and start the loop', () => {
+        state.gameState.set('paused');
+        facade.togglePause();
+
+        expect(state.gameState()).toBe('playing');
+        expect(loop.resetTime).toHaveBeenCalledTimes(1);
+        expect(loop.start).toHaveBeenCalledTimes(1);
+    });
+
+    it('should do nothing if game is not in "playing" or "paused" state', () => {
+        state.gameState.set('gameOver');
+        facade.togglePause();
+        expect(loop.stop).not.toHaveBeenCalled();
+        expect(loop.start).not.toHaveBeenCalled();
+    });
+  });
+});
+--- END OF FILE: src/services/game.facade.spec.ts ---
+
 --- START OF FILE: src/services/game.facade.ts ---
 import { Injectable, inject } from '@angular/core';
 import { GameStateService, PowerUp } from './game-state.service';
@@ -2175,6 +3928,7 @@ export class GameFacade {
   readonly dropProgress = this.state.dropProgress.asReadonly();
   readonly animationMode = this.state.animationMode.asReadonly();
   readonly ghostPiece = this.animation.ghostPiece;
+  readonly isHoldingAllowed = this.state.isHoldingAllowed.asReadonly();
 
   // --- Action Methods (for touch controls) ---
   readonly moveLeft = this.actions.moveLeft.bind(this.actions);
@@ -2257,6 +4011,143 @@ export class GameFacade {
 }
 
 --- END OF FILE: src/services/game.facade.ts ---
+
+--- START OF FILE: src/services/input.service.spec.ts ---
+import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+import { InputService } from './input.service';
+import { GameStateService } from './game-state.service';
+import { GameActionsService } from './game-actions.service';
+import { PowerUpService } from './power-up.service';
+import { DAS_DELAY, ARR_INTERVAL } from '../utils/constants';
+import { GameState } from '../utils/game-state.interface';
+
+// Mocks
+class MockGameStateService {
+  isAiming = signal(false);
+  gameState = signal<GameState>('playing');
+  softDropActive = signal(false);
+}
+class MockGameActionsService {
+  moveLeft = vi.fn();
+  moveRight = vi.fn();
+  softDrop = vi.fn();
+  rotate = vi.fn();
+  hardDrop = vi.fn();
+  hold = vi.fn();
+}
+class MockPowerUpService {
+    handleAimerKeys = vi.fn();
+    activatePowerUp = vi.fn();
+}
+
+describe('InputService', () => {
+  let service: InputService;
+  let actions: MockGameActionsService;
+  let state: MockGameStateService;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    TestBed.configureTestingModule({
+      providers: [
+        InputService,
+        { provide: GameStateService, useClass: MockGameStateService },
+        { provide: GameActionsService, useClass: MockGameActionsService },
+        { provide: PowerUpService, useClass: MockPowerUpService },
+      ],
+    });
+    service = TestBed.inject(InputService);
+    actions = TestBed.inject(GameActionsService) as any;
+    state = TestBed.inject(GameStateService) as any;
+  });
+
+  afterEach(() => {
+    service.clearTimers();
+    vi.clearAllMocks();
+    vi.useRealTimers();
+  });
+
+  describe('Horizontal Movement (DAS/ARR)', () => {
+    it('should handle the full press-hold-release lifecycle for ArrowLeft', async () => {
+      // 1. Initial Press
+      service.press('ArrowLeft');
+      expect(actions.moveLeft).toHaveBeenCalledTimes(1);
+
+      // 2. Advance time just before DAS delay expires
+      await vi.advanceTimersByTimeAsync(DAS_DELAY - 1);
+      expect(actions.moveLeft).toHaveBeenCalledTimes(1);
+
+      // 3. Advance time to trigger DAS. This only sets up the interval.
+      await vi.advanceTimersByTimeAsync(1);
+      expect(actions.moveLeft).toHaveBeenCalledTimes(1); // No new call yet
+
+      // 4. Advance time for the first ARR trigger
+      await vi.advanceTimersByTimeAsync(ARR_INTERVAL);
+      expect(actions.moveLeft).toHaveBeenCalledTimes(2);
+
+      // 5. Advance time for three more ARR triggers
+      await vi.advanceTimersByTimeAsync(ARR_INTERVAL * 3);
+      expect(actions.moveLeft).toHaveBeenCalledTimes(2 + 3);
+
+      // 6. Release the key
+      service.release('ArrowLeft');
+      await vi.advanceTimersByTimeAsync(ARR_INTERVAL * 5); // Advance time far into the future
+      expect(actions.moveLeft).toHaveBeenCalledTimes(5); // No more calls
+    });
+  });
+
+  describe('Soft Drop', () => {
+    it('should call softDrop repeatedly on ArrowDown press and stop on release', async () => {
+      // 1. Initial press
+      service.press('ArrowDown');
+      expect(actions.softDrop).toHaveBeenCalledTimes(1);
+      expect(state.softDropActive()).toBe(true);
+
+      // 2. Advance time to trigger soft drop repeat
+      await vi.advanceTimersByTimeAsync(ARR_INTERVAL);
+      expect(actions.softDrop).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(ARR_INTERVAL);
+      expect(actions.softDrop).toHaveBeenCalledTimes(3);
+
+      // 3. Release key
+      service.release('ArrowDown');
+      expect(state.softDropActive()).toBe(false);
+
+      // 4. Advance time again, no more calls should be made
+      await vi.advanceTimersByTimeAsync(ARR_INTERVAL * 2);
+      expect(actions.softDrop).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe('Other inputs', () => {
+    it('should call rotate on ArrowUp', () => {
+        service.press('ArrowUp');
+        expect(actions.rotate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call hardDrop on Space', () => {
+        service.press(' ');
+        expect(actions.hardDrop).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call hold on "c"', () => {
+        service.press('c');
+        expect(actions.hold).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not process inputs if game state is not "playing"', () => {
+        state.gameState = signal('paused');
+        service.press('ArrowLeft');
+        service.press('ArrowDown');
+        expect(actions.moveLeft).not.toHaveBeenCalled();
+        expect(actions.softDrop).not.toHaveBeenCalled();
+    });
+  });
+});
+--- END OF FILE: src/services/input.service.spec.ts ---
 
 --- START OF FILE: src/services/input.service.ts ---
 import { Injectable, inject } from '@angular/core';
@@ -2590,6 +4481,69 @@ getTestBed().initTestEnvironment(
 
 --- END OF FILE: src/test-setup.ts ---
 
+--- START OF FILE: src/utils/board.utils.spec.ts ---
+import { describe, it, expect } from 'vitest';
+import { applyGravityToColumn } from './board.utils';
+import { ROWS } from './constants';
+
+describe('BoardUtils', () => {
+  describe('applyGravityToColumn', () => {
+    // Helper to get a specific column from a board
+    const getColumn = (board: number[][], colIndex: number): number[] =>
+      board.map(row => row[colIndex]);
+
+    // Helper to create a board from a single column's definition
+    const createBoardFromColumn = (column: number[]): number[][] => {
+      const board = Array.from({ length: ROWS }, () => Array(1).fill(0));
+      for (let i = 0; i < ROWS; i++) {
+        board[i][0] = column[i] || 0;
+      }
+      return board;
+    };
+
+    it('should correctly apply gravity to a column with a single gap', () => {
+      const initialColumn = [1, 0, 1];
+      const board = createBoardFromColumn(initialColumn);
+      applyGravityToColumn(board, 0);
+      const finalColumn = getColumn(board, 0);
+      expect(finalColumn.slice(-3)).toEqual([0, 1, 1]);
+    });
+
+    it('should correctly apply gravity to a column with multiple gaps', () => {
+      const initialColumn = [1, 0, 1, 0, 1];
+      const board = createBoardFromColumn(initialColumn);
+      applyGravityToColumn(board, 0);
+      const finalColumn = getColumn(board, 0);
+      expect(finalColumn.slice(-5)).toEqual([0, 0, 1, 1, 1]);
+    });
+
+    it('should not modify a column that is already full', () => {
+      const initialColumn = Array(ROWS).fill(1);
+      const board = createBoardFromColumn([...initialColumn]);
+      applyGravityToColumn(board, 0);
+      const finalColumn = getColumn(board, 0);
+      expect(finalColumn).toEqual(initialColumn);
+    });
+
+    it('should not modify a column that is completely empty', () => {
+      const initialColumn = Array(ROWS).fill(0);
+      const board = createBoardFromColumn([...initialColumn]);
+      applyGravityToColumn(board, 0);
+      const finalColumn = getColumn(board, 0);
+      expect(finalColumn).toEqual(initialColumn);
+    });
+
+    it('should handle complex cases with multiple blocks and gaps', () => {
+        const initialColumn = [0, 2, 0, 3, 0, 4, 0, 0, 5, 0];
+        const board = createBoardFromColumn(initialColumn);
+        applyGravityToColumn(board, 0);
+        const finalColumn = getColumn(board, 0);
+        expect(finalColumn.slice(-10)).toEqual([0, 0, 0, 0, 0, 0, 2, 3, 4, 5]);
+    });
+  });
+});
+--- END OF FILE: src/utils/board.utils.spec.ts ---
+
 --- START OF FILE: src/utils/board.utils.ts ---
 /**
  * @fileoverview Utility functions related to the game board.
@@ -2676,79 +4630,84 @@ export const PIECE_COLORS: { [key: number]: string } = {
 
 --- START OF FILE: src/utils/game-logic.utils.spec.ts ---
 import { describe, it, expect } from 'vitest';
-import { isValidPosition } from './game-logic.utils';
-import { Piece } from './piece.interface';
+import { clearLines, calculateScore } from './game-logic.utils';
 import { COLS, ROWS } from './constants';
-import { createEmptyBoard } from './board.utils';
 
-describe('isValidPosition', () => {
-  // Test case 1: A valid position
-  it('should return true for a valid position within the board and without collisions', () => {
-    const piece: Piece = {
-      x: 3,
-      y: 4,
-      shape: [[1, 1], [1, 1]], // A square piece
-    };
-    const board = createEmptyBoard();
-    expect(isValidPosition(piece, board)).toBe(true);
-  });
+describe('GameLogicUtils', () => {
+  describe('clearLines', () => {
+    it('should return the same board and 0 lines cleared when no lines are full', () => {
+      const board = Array(ROWS).fill(Array(COLS).fill(0));
+      const { boardAfterClear, lines } = clearLines(board);
+      expect(lines).toBe(0);
+      expect(boardAfterClear).toEqual(board);
+    });
 
-  // Test case 2: Collision with a border
-  it('should return false for a piece colliding with the right border', () => {
-    const piece: Piece = {
-      x: COLS - 1, // Positioned at the right edge
-      y: 4,
-      shape: [[1, 1], [1, 1]], // A square piece, part of it will be out of bounds
-    };
-    const board = createEmptyBoard();
-    expect(isValidPosition(piece, board)).toBe(false);
-  });
+    it('should clear one full line and add a new empty line at the top', () => {
+      const board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+      board[ROWS - 1] = Array(COLS).fill(1); // Full line at the bottom
 
-  it('should return false for a piece colliding with the left border', () => {
-    const piece: Piece = {
-      x: -1, // Positioned at the left edge
-      y: 4,
-      shape: [[1, 1], [1, 1]],
-    };
-    const board = createEmptyBoard();
-    expect(isValidPosition(piece, board)).toBe(false);
-  });
+      const { boardAfterClear, lines } = clearLines(board);
 
-    it('should return false for a piece colliding with the bottom border', () => {
-    const piece: Piece = {
-      x: 3,
-      y: ROWS -1, // Positioned at the bottom edge
-      shape: [[1, 1], [1, 1]],
-    };
-    const board = createEmptyBoard();
-    expect(isValidPosition(piece, board)).toBe(false);
-  });
+      const expectedBoard = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
 
-  // Test case 3: Collision with another piece
-  it('should return false for a piece colliding with an existing piece on the board', () => {
-    const piece: Piece = {
-      x: 3,
-      y: 4,
-      shape: [[1, 1], [1, 1]],
-    };
-    const board = createEmptyBoard();
-    // Place a block where the new piece wants to go
-    board[5][4] = 2; // y=5, x=4 corresponds to the bottom-left of the piece
-    expect(isValidPosition(piece, board)).toBe(false);
-  });
+      expect(lines).toBe(1);
+      expect(boardAfterClear).toEqual(expectedBoard);
+      expect(boardAfterClear[0].every(cell => cell === 0)).toBe(true);
+    });
 
-  // Edge case: Piece is partially off the top of the board (which is valid)
-  it('should return true for a piece that is partially above the board', () => {
-    const piece: Piece = {
-      x: 3,
-      y: -1, // Spawn position, one row is hidden
-      shape: [[1, 1], [1, 1]],
-    };
-    const board = createEmptyBoard();
-    expect(isValidPosition(piece, board)).toBe(true);
-  });
+    it('should clear multiple non-contiguous lines and compact the board correctly', () => {
+        const board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+        board[ROWS - 1] = Array(COLS).fill(1); // Full line
+        board[ROWS - 3] = Array(COLS).fill(1); // Full line
+        board[ROWS - 2] = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0]; // Not full
+
+        const { boardAfterClear, lines } = clearLines(board);
+
+        expect(lines).toBe(2);
+        // Expect two new empty lines at the top
+        expect(boardAfterClear[0].every(cell => cell === 0)).toBe(true);
+        expect(boardAfterClear[1].every(cell => cell === 0)).toBe(true);
+        // Expect the non-full line to have shifted down
+        expect(boardAfterClear[ROWS - 1]).toEqual([1, 0, 1, 0, 1, 0, 1, 0, 1, 0]);
+      });
+
+      it('should clear a Tetris (4 lines) and return the correct score', () => {
+        const board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+        for (let i = 1; i <= 4; i++) {
+          board[ROWS - i] = Array(COLS).fill(2); // Four full lines
+        }
+
+        const { boardAfterClear, lines } = clearLines(board);
+
+        const expectedBoard = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+
+        expect(lines).toBe(4);
+        expect(boardAfterClear).toEqual(expectedBoard);
+      });
+    });
+
+    describe('calculateScore', () => {
+      it('should return the correct score for level 1', () => {
+        expect(calculateScore(1, 1)).toBe(100);
+        expect(calculateScore(2, 1)).toBe(300);
+        expect(calculateScore(3, 1)).toBe(500);
+        expect(calculateScore(4, 1)).toBe(800);
+      });
+
+      it('should apply the level multiplier correctly', () => {
+        // 1 line on level 10 -> 100 * 10 = 1000
+        expect(calculateScore(1, 10)).toBe(1000);
+        // 4 lines on level 5 -> 800 * 5 = 4000
+        expect(calculateScore(4, 5)).toBe(4000);
+        // 2 lines on level 7 -> 300 * 7 = 2100
+        expect(calculateScore(2, 7)).toBe(2100);
+      });
+
+      it('should return 0 for 0 lines cleared', () => {
+        expect(calculateScore(0, 10)).toBe(0);
+      });
+    });
 });
-
 --- END OF FILE: src/utils/game-logic.utils.spec.ts ---
 
 --- START OF FILE: src/utils/game-logic.utils.ts ---
@@ -2844,6 +4803,63 @@ export interface Piece {
 
 --- END OF FILE: src/utils/piece.interface.ts ---
 
+--- START OF FILE: src/utils/piece.utils.spec.ts ---
+import { describe, it, expect } from 'vitest';
+import { rotate } from './piece.utils';
+import { Piece } from './piece.interface';
+
+describe('PieceUtils', () => {
+  describe('rotate', () => {
+    // Helper function to create a piece for testing
+    const createTestPiece = (shape: number[][]): Piece => ({
+      x: 0,
+      y: 0,
+      shape,
+    });
+
+    it('should correctly rotate the J piece', () => {
+      const jPiece = createTestPiece([[2, 0, 0], [2, 2, 2]]);
+      const rotated = rotate(jPiece);
+      expect(rotated.shape).toEqual([[2, 2], [2, 0], [2, 0]]);
+    });
+
+    it('should correctly rotate the L piece', () => {
+      const lPiece = createTestPiece([[0, 0, 3], [3, 3, 3]]);
+      const rotated = rotate(lPiece);
+      expect(rotated.shape).toEqual([[3, 0], [3, 0], [3, 3]]);
+    });
+
+    it('should correctly rotate the S piece', () => {
+      const sPiece = createTestPiece([[0, 5, 5], [5, 5, 0]]);
+      const rotated = rotate(sPiece);
+      expect(rotated.shape).toEqual([[5, 0], [5, 5], [0, 5]]);
+    });
+
+    it('should correctly rotate the T piece', () => {
+      const tPiece = createTestPiece([[0, 6, 0], [6, 6, 6]]);
+      const rotated = rotate(tPiece);
+      expect(rotated.shape).toEqual([[6, 0], [6, 6], [6, 0]]);
+    });
+
+    it('should correctly rotate the Z piece', () => {
+      const zPiece = createTestPiece([[7, 7, 0], [0, 7, 7]]);
+      const rotated = rotate(zPiece);
+      expect(rotated.shape).toEqual([[0, 7], [7, 7], [7, 0]]);
+    });
+
+    // The 'O' piece is symmetrical, but we can test it for completeness
+    it('should not change the shape of the O piece after four rotations', () => {
+        const oPiece = createTestPiece([[4, 4], [4, 4]]);
+        let rotated = rotate(oPiece);
+        rotated = rotate(rotated);
+        rotated = rotate(rotated);
+        rotated = rotate(rotated);
+        expect(rotated.shape).toEqual([[4, 4], [4, 4]]);
+      });
+  });
+});
+--- END OF FILE: src/utils/piece.utils.spec.ts ---
+
 --- START OF FILE: src/utils/piece.utils.ts ---
 /**
  * @fileoverview Utility functions for creating and manipulating Tetris pieces.
@@ -2896,7 +4912,16 @@ export function rotate(piece: Piece): Piece {
 
 --- END OF FILE: src/utils/piece.utils.ts ---
 
---- START OF FILE: tsconfig.json ---
+--- START OF FILE: tsconfig.app.json ---
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "src/**/*.spec.ts"
+  ]
+}
+--- END OF FILE: tsconfig.app.json ---
+
+--- START OF FILE: tsconfig.base.json ---
 {
   "compilerOptions": {
     "target": "ES2022",
@@ -2923,21 +4948,34 @@ export function rotate(piece: Piece): Piece {
       ]
     }
   },
+  "angularCompilerOptions": {
+    "disableTypeScriptVersionCheck": true
+  }
+}
+--- END OF FILE: tsconfig.base.json ---
+
+--- START OF FILE: tsconfig.json ---
+{
+  "extends": "./tsconfig.base.json",
   "include": [
     "src/**/*.ts",
     "*.ts",
     "index.tsx"
-  ],
-  "angularCompilerOptions": {
-    "disableTypeScriptVersionCheck": true
-  }
+  ]
 }
 --- END OF FILE: tsconfig.json ---
 
 --- START OF FILE: vite.config.ts ---
 /// <reference types="vitest" />
+/// <reference types="vitest/globals" />
 import { defineConfig } from 'vite';
 import angular from '@analogjs/vite-plugin-angular';
+
+// Common exclusion patterns for tests and coverage
+const commonExcludes = [
+  'src/**/*.d.ts',
+  'src/test-setup.ts',
+];
 
 export default defineConfig({
   plugins: [
@@ -2950,6 +4988,30 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['src/test-setup.ts'],
     include: ['src/**/*.spec.ts'],
+    exclude: [...commonExcludes],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov', 'json-summary'],
+      include: ['src/**/*.ts'],
+      exclude: [
+        ...commonExcludes,
+        'src/**/*.spec.ts',
+      ],
+      reportsDirectory: './coverage',
+      thresholds: {
+        global: {
+          branches: 80,
+          functions: 80,
+          lines: 80,
+          statements: 80
+        }
+      }
+    },
+    reporters: ['default', 'html'],
+    typecheck: {
+      enabled: true,
+      tsconfig: 'tsconfig.json',
+    },
   },
 });
 
