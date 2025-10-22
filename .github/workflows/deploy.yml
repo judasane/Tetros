@@ -1,42 +1,73 @@
-name: Deploy to GitHub Pages
+name: Deploy to Firebase Hosting
+
 on:
   push:
     branches:
+      - main
       - development
+
 permissions:
   contents: read
-  pages: write
-  id-token: write
+
 concurrency:
-  group: "pages"
+  group: "firebase-deploy-${{ github.ref }}"
   cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+          cache: 'npm'
+
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
       - name: Build
-        run: npm run build -- --base-href /${{ github.event.repository.name }}/
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          path: ./dist  # Quitar el /* - debe ser solo la carpeta
+          name: dist
+          path: dist/
+          retention-days: 1
+
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     needs: build
+    runs-on: ubuntu-latest
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Deploy to Firebase Hosting (Production)
+        if: github.ref == 'refs/heads/main'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseToken: ${{ secrets.FIREBASE_TOKEN }}
+          channelId: live
+          projectId: tetros
+          target: production
+
+      - name: Deploy to Firebase Hosting (Preview)
+        if: github.ref == 'refs/heads/development'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseToken: ${{ secrets.FIREBASE_TOKEN }}
+          channelId: live
+          projectId: tetros
+          target: preview
