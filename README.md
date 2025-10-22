@@ -187,7 +187,7 @@ npm test -- src/services/game-loop.service.spec.ts
 
 | Ambiente | Rama | URL | Trigger de Deploy |
 |----------|------|-----|-------------------|
-| **Production** | `main` | TBD | Merge a `main` |
+| **Production** | `development` | TBD | Merge a `development` |
 | **Preview** | Ramas PR | TBD | Creación de PR |
 
 ### Pipeline CI/CD
