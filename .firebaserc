@@ -1,9 +1,18 @@
 {
   "projects": {
-    "default": "tetros",
-    "production": "tetros",
-    "preview": "pre-tetros"
+    "default": "tetros"
   },
-  "targets": {},
+  "targets": {
+    "tetros": {
+      "hosting": {
+        "production": [
+          "tetros"
+        ],
+        "preview": [
+          "pre-tetros"
+        ]
+      }
+    }
+  },
   "etags": {}
 }
