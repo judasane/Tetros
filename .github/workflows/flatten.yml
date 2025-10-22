@@ -1,66 +1,140 @@
-name: Create Flattened File
+name: 🎮 Flatten Repository
 
 on:
+  push:
+    branches:
+      - development
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   flatten-and-commit:
+    name: Generate Flattened Repository File
     runs-on: ubuntu-latest
+    # Prevent infinite loop: skip if last commit was from github-actions bot
+    if: github.event.head_commit.author.name != 'github-actions[bot]'
     permissions:
       contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate flattened file
         run: |
-          OUTPUT_FILE="flattened_output.txt"
-          # Add or remove file extensions to exclude
-          EXCLUDE_EXTENSIONS="map,tsbuildinfo,log,lock,db,sqlite,sqlite3,dump,lcov,png,jpg,jpeg,gif,ico,zip,gz,pdf,mp4,svg"
-          # Add or remove specific filenames to exclude
-          EXCLUDE_FILES="package-lock.json,yarn.lock,pnpm-lock.yaml"
+          echo "🔍 Starting flatten process..."
 
-          echo "--- FLATTENED REPOSITORY SOURCE ---" > "$OUTPUT_FILE"
+          echo "📋 Files currently tracked by git:"
+          git ls-files 'flattened*.txt' 'repository_flattened.txt' 'flattened_output.txt' 2>/dev/null || echo "No flattened files in git"
+
+          # Generate filename with repo name and timestamp
+          REPO_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2)
+          TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+          OUTPUT_FILE="flattened_${REPO_NAME}_${TIMESTAMP}.txt"
+
+          echo "📝 Output file will be: $OUTPUT_FILE"
+
+          EXCLUDE_EXTENSIONS="map,tsbuildinfo,log,lock,db,sqlite,sqlite3,dump,lcov,png,jpg,jpeg,gif,ico,zip,gz,pdf,mp4,svg,webp"
+          EXCLUDE_FILES="package-lock.json,yarn.lock,pnpm-lock.yaml"
+          EXCLUDE_DIRS="node_modules,bower_components,dist,build,out,.next,.nuxt,.svelte-kit,coverage,.idea,.vscode,.fleet,.venv,venv,.angular"
+
+          echo "==================================" > "$OUTPUT_FILE"
+          echo "FLATTENED: $REPO_NAME" >> "$OUTPUT_FILE"
+          echo "Type: Game Project" >> "$OUTPUT_FILE"
           echo "Generated at: $(date)" >> "$OUTPUT_FILE"
           echo "Branch: ${GITHUB_REF##*/}" >> "$OUTPUT_FILE"
           echo "Commit: ${GITHUB_SHA}" >> "$OUTPUT_FILE"
-          echo "------------------------------------" >> "$OUTPUT_FILE"
+          echo "Repository: $GITHUB_REPOSITORY" >> "$OUTPUT_FILE"
+          echo "==================================" >> "$OUTPUT_FILE"
           echo "" >> "$OUTPUT_FILE"
 
           exclude_ext_pattern=$(echo "$EXCLUDE_EXTENSIONS" | sed 's/,/|/g')
-          # Also exclude the output file itself
-          exclude_files_pattern="$OUTPUT_FILE|$(echo "$EXCLUDE_FILES" | sed 's/,/|/g')"
+          exclude_files_pattern="$(echo "$EXCLUDE_FILES" | sed 's/,/|/g')"
+          exclude_dirs_pattern=$(echo "$EXCLUDE_DIRS" | sed 's/,/|/g')
+
+          echo "🔎 Scanning repository files..."
+          FILE_COUNT=0
 
           git ls-files | \
+          grep -vE "^($exclude_dirs_pattern)/" | \
           grep -vE "\.($exclude_ext_pattern)$" | \
           grep -vE "^($exclude_files_pattern)$" | \
+          grep -vE "^flattened.*\.txt$" | \
+          grep -vE "^repository_flattened\.txt$" | \
           while IFS= read -r file; do
-              echo "--- START OF FILE: $file ---" >> "$OUTPUT_FILE"
-              cat "$file" >> "$OUTPUT_FILE"
-              echo -e "\n--- END OF FILE: $file ---\n" >> "$OUTPUT_FILE"
+              if [ -f "$file" ]; then
+                echo "--- START OF FILE: $file ---" >> "$OUTPUT_FILE"
+                cat "$file" >> "$OUTPUT_FILE"
+                echo -e "\n--- END OF FILE: $file ---\n" >> "$OUTPUT_FILE"
+                FILE_COUNT=$((FILE_COUNT + 1))
+              fi
           done
 
           echo "✅ Repository flattened into $OUTPUT_FILE"
 
+          # Verify file was created
+          if [ -f "$OUTPUT_FILE" ]; then
+            FILE_SIZE=$(wc -c < "$OUTPUT_FILE")
+            echo "📊 File created successfully: $FILE_SIZE bytes"
+            echo "📄 First few lines:"
+            head -n 10 "$OUTPUT_FILE"
+          else
+            echo "❌ ERROR: Output file was not created!"
+            exit 1
+          fi
+
+          # Save variables for later steps
+          echo "OUTPUT_FILE=$OUTPUT_FILE" >> $GITHUB_ENV
+
       - name: Commit and push flattened file
         run: |
+          echo "🔧 Configuring git..."
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add $OUTPUT_FILE
-          # Check if there are changes to commit to avoid empty commits
+
+          echo "📋 Files in working directory BEFORE cleanup:"
+          ls -lh flattened*.txt repository_flattened.txt flattened_output.txt 2>/dev/null || echo "No flattened files found"
+
+          echo "🗑️ Removing ALL old flattened files except the new one..."
+          # Use git ls-files to find all tracked flattened files
+          git ls-files 'flattened*.txt' 'repository_flattened.txt' 'flattened_output.txt' 2>/dev/null | while read -r old_file; do
+            if [ "$old_file" != "$OUTPUT_FILE" ]; then
+              echo "  Removing from git: $old_file"
+              git rm -f "$old_file"
+            fi
+          done
+
+          echo "📋 Files in working directory AFTER cleanup:"
+          ls -lh flattened*.txt 2>/dev/null || echo "Only new file should remain"
+
+          echo "➕ Adding new flattened file: $OUTPUT_FILE"
+          git add -f "$OUTPUT_FILE"
+
+          echo "📊 Git diff summary:"
+          git diff --staged --stat
+
+          echo "📊 Detailed changes:"
+          git status --short
+
           if git diff --staged --quiet; then
-            echo "No changes to commit. The flattened file is already up-to-date."
+            echo "⚠️  No changes to commit."
           else
-            git commit -m "docs: Add/update flattened repository file" -m "This commit was generated by a GitHub Action."
+            echo "💾 Committing changes..."
+            git commit -m "docs: Update flattened repository file [skip ci]" -m "Generated at: $(date)" -m "Auto-generated by GitHub Actions."
+
+            echo "🚀 Pushing to remote..."
             git push
+            echo "✅ Changes pushed successfully!"
           fi
-        env:
-          OUTPUT_FILE: "flattened_output.txt"
 
       - name: Upload artifact for easy download
         uses: actions/upload-artifact@v4
         with:
           name: flattened-repository-file
-          path: flattened_output.txt
+          path: flattened_*.txt
           if-no-files-found: error
