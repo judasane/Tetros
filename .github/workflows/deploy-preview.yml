@@ -1,19 +1,20 @@
-name: Deploy to Firebase Hosting (Production)
+name: Deploy to Firebase Hosting (Preview)
 
 on:
-  push:
+  pull_request:
     branches:
       - development
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
-  group: "firebase-production"
-  cancel-in-progress: false
+  group: "firebase-preview-${{ github.event.pull_request.number }}"
+  cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  build-and-deploy-preview:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -31,10 +32,10 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Deploy to Firebase Hosting
+      - name: Deploy to Firebase Preview Channel
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TETROS }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRE_TETROS }}
           channelId: live
-          projectId: tetros
+          projectId: pre-tetros

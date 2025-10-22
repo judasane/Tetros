@@ -1,0 +1,9 @@
+{
+  "projects": {
+    "default": "tetros",
+    "production": "tetros",
+    "preview": "pre-tetros"
+  },
+  "targets": {},
+  "etags": {}
+}
