@@ -2,7 +2,7 @@
   "hosting": [
     {
       "target": "production",
-      "public": "dist/browser",
+      "public": "dist",
       "ignore": [
         "firebase.json",
         "**/.*",
@@ -12,32 +12,12 @@
         {
           "source": "**",
           "destination": "/index.html"
-        }
-      ],
-      "headers": [
-        {
-          "source": "**/*.@(jpg|jpeg|gif|png|svg|webp)",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "max-age=31536000"
-            }
-          ]
-        },
-        {
-          "source": "**/*.@(js|css)",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "max-age=31536000"
-            }
-          ]
         }
       ]
     },
     {
       "target": "preview",
-      "public": "dist/browser",
+      "public": "dist",
       "ignore": [
         "firebase.json",
         "**/.*",
@@ -47,26 +27,6 @@
         {
           "source": "**",
           "destination": "/index.html"
-        }
-      ],
-      "headers": [
-        {
-          "source": "**/*.@(jpg|jpeg|gif|png|svg|webp)",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "max-age=31536000"
-            }
-          ]
-        },
-        {
-          "source": "**/*.@(js|css)",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "max-age=31536000"
-            }
-          ]
         }
       ]
     }
